@@ -1,0 +1,714 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>OBS Video Screen</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            width: 1920px;
+            height: 1080px;
+            background-color: #00ff00; /* Зеленый фон для chroma key */
+            position: relative;
+            overflow: hidden;
+            font-family: Arial, sans-serif;
+        }
+        
+        .video-container {
+            position: absolute;
+            border-radius: 10px;
+            overflow: hidden;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+            transition: transform 0.3s ease, opacity 0.3s ease;
+        }
+        
+        .video-container video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            display: block;
+        }
+        
+        .video-overlay {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            color: white;
+            padding: 5px 10px;
+            font-size: 12px;
+            display: none; /* Скрываем в обычном режиме */
+        }
+        
+        /* Индикатор для отладки (показывается при ?debug в URL) */
+        .debug-info {
+            position: fixed;
+            top: 10px;
+            left: 10px;
+            background: rgba(0, 0, 0, 0.7);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            font-size: 14px;
+            z-index: 10000;
+        }
+        
+        .status-indicator {
+            position: fixed;
+            top: 10px;
+            right: 10px;
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            /* disabled colors */
+            background-color: #00ff0000; 
+            box-shadow: 0 0 10px #00ff0000;
+            z-index: 10000;
+        }
+        
+        .connection-lost {
+            background-color: #ff0000 !important;
+            box-shadow: 0 0 10px #ff0000 !important;
+        }
+
+        .pb-progress-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            width: 20%;
+            min-width: 200px;
+            background: rgba(0, 0, 0, 0.699);
+            border-radius: 12px;
+            padding: 12px 16px;
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
+            z-index: 9999;
+            transition: transform 0.3s ease, opacity 0.3s ease;
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .pb-progress-container.hidden {
+            transform: translateY(-120%);
+            opacity: 0;
+            pointer-events: none;
+        }
+
+        .pb-label {
+            font-size: 20px;
+            color: #fc9700;
+            margin-bottom: 8px;
+            font-weight: bolder;
+            font-family: Arial, Helvetica, sans-serif;
+        }
+
+        .pb-bar-wrapper {
+            position: relative;
+            width: 100%;
+            height: 24px;
+            background: #382000c7;
+            border-radius: 12px;
+            overflow: hidden;
+        }
+
+        .pb-bar-fill {
+            position: absolute;
+            top: 0;
+            left: 0;
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #ff9900, #ff5e00);
+            border-radius: 12px;
+            transition: width 0.3s ease;
+        }
+
+        .pb-bar-text {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: #ffffff;
+            font-size: 16px;
+            font-weight: 600;
+            text-shadow: 0 1px 2px rgba(0, 0, 0, 0.308);
+            z-index: 1;
+            white-space: nowrap;
+        }
+    </style>
+</head>
+<body>
+    <div id="video-container"></div>
+    
+    <!-- Отладочная информация (показывается при ?debug) -->
+    <div class="debug-info" id="debugInfo" style="display: none;">
+        Active Videos: <span id="videoCount">0</span><br>
+        Connection: <span id="connectionStatus">Connected</span>
+    </div>
+    
+    <div class="status-indicator" id="statusIndicator"></div>
+
+    <div id="pbProgressBar" class="pb-progress-container hidden">
+        <center><div class="pb-label">МЕМНЫЙ НАСЁР</div></center>
+        <div class="pb-bar-wrapper">
+            <div class="pb-bar-fill" id="pbBarFill"></div>
+            <span class="pb-bar-text" id="pbBarText">0 из 100</span>
+        </div>
+    </div>
+    
+    <script src="/socket.io/socket.io.js"></script>
+    <script>
+        // Проверяем режим отладки
+        const urlParams = new URLSearchParams(window.location.search);
+        const debugMode = urlParams.has('debug');
+        
+        if (debugMode) {
+            document.getElementById('debugInfo').style.display = 'block';
+        };
+        
+        const socket = io();
+        let connectionActive = true;
+        
+        // Элементы DOM
+        const videoContainer = document.getElementById('video-container');
+        const statusIndicator = document.getElementById('statusIndicator');
+        const videoCountElement = document.getElementById('videoCount');
+        const connectionStatusElement = document.getElementById('connectionStatus');
+        
+        // Обновление счетчика видео
+        function updateVideoCount() {
+            if (debugMode) {
+                videoCountElement.textContent = document.querySelectorAll('.video-container').length;
+            }
+        };
+        
+        // Создание элемента видео
+        function createVideoElement(videoData) {
+            var container = document.createElement('div');
+            container.className = 'video-container';
+            container.id = `video_${videoData.id}`;
+            container.dataset.videoId = videoData.id;
+            container.dataset.url = videoData.url;
+            
+            // Стилизация
+            container.style.maxWidth = `${videoData.width}px`;
+            container.style.maxHeight = `${videoData.height}px`;
+            container.style.top = `${videoData.top}px`;
+            container.style.left = `${videoData.left}px`;
+            container.style.transform = `rotate(${videoData.rotation}deg)`;
+            
+            // Создаем видео элемент
+            const video = document.createElement('video');
+            video.autoplay = true;
+            // video.muted = false; // Включаем звук
+            
+            // ютуб хуита
+            if(videoData.isYouTube) {
+                // разлок высоты для шортов
+                if(videoData.url.includes('/shorts/')) {
+                    container.style.maxHeight = ``;
+                };
+                // делаем елемент
+                var yvid = createYouTubePlayer(videoData);
+                if(yvid === undefined) {return}
+                else {container.innerHTML = yvid}
+
+            // остальные
+            } else {
+                video.src = videoData.url;
+                video.volume = videoData.volume;
+
+                if(videoData.isTiktok) {
+                    video.loop = true;
+                    container.style.maxHeight = ``;
+                } else {
+                    video.loop = false;
+                    // Обработка конца видео
+                    video.onended = function() {
+                        removeVideoElement(videoData.id);
+                    };
+                }
+                
+                container.appendChild(video);
+                
+                // Автоматическое удаление через (на всякий случай)
+                setTimeout(() => {
+                    removeVideoElement(videoData.id);
+                }, videoData.duration);
+            };
+            
+            // Добавляем оверлей для отладки
+            if (debugMode) {
+                const overlay = document.createElement('div');
+                overlay.className = 'video-overlay';
+                overlay.textContent = `ID: ${videoData.id.substring(0, 8)}`;
+                overlay.style.display = 'block';
+                container.appendChild(overlay);
+            };
+
+            if(!videoData.affected) {
+                pbAddToCount(1);
+                histAdd(videoData.url)
+            };
+            return container
+        };
+
+        // Функция для извлечения ID видео из различных форматов ссылок YouTube
+        function getYouTubeVideoId(url) {
+            const regex = /(?:youtube\.com\/(?:[^\/\n\s]+\/\S+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/|youtube\.com\/shorts\/)([a-zA-Z0-9_-]{11})/;
+            const match = url.match(regex);
+            return match ? match[1] : null;
+        };
+
+        // Функция для создания URL embed
+        function getYouTubeEmbedUrl(url, isShort = false) {
+            const videoId = getYouTubeVideoId(url);
+            if (!videoId) return null;
+            const baseUrl = 'https://www.youtube-nocookie.com/embed/';
+            if (isShort) {return `${baseUrl}${videoId}?playsinline=1`}
+            return `${baseUrl}${videoId}`;
+        };
+
+        // Основная логика
+        function createYouTubePlayer(videoData) {
+            // Проверяем, является ли видео shorts
+            const isShort = videoData.url.includes('/shorts/');
+            // Получаем embed URL
+            const embedUrl = getYouTubeEmbedUrl(videoData.url, isShort);
+            if (!embedUrl) {console.error('Invalid YouTube URL'); return};
+            // Параметры для iframe
+            let params = new URLSearchParams();
+            // Общие параметры
+            params.append('rel', '0'); // Не показывать похожие видео
+            params.append('modestbranding', '1'); // Минимальный брендинг
+            // Для обычных видео
+            if (!isShort) {
+                params.append('autoplay', '1');
+                params.append('controls', '0');
+                // params.append('mute', '1'); // Важно: видео должно быть с заглушенным звуком для автозапуска
+                params.append('playsinline', '1');
+            }
+            // Для shorts
+            else {
+                params.append('autoplay', '1');
+                params.append('controls', '0');
+                // params.append('mute', '1');
+                params.append('playsinline', '1');
+                params.append('loop', '1');
+            };
+            // Создаем iframe
+            return `
+                <iframe 
+                    width="${videoData.width}" 
+                    height="${videoData.height}" 
+                    src="${embedUrl}?${params.toString()}" 
+                    frameborder="0" 
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" 
+                    allowfullscreen
+                    style="display: block;"
+                    title="YouTube video player">
+                </iframe>`;
+        };
+        // tiktok get videodata for embed
+        function parseTikTokUrl(url) {
+            try {
+                // Создаем объект URL для парсинга
+                const urlObj = new URL(url);
+                // Разбиваем pathname на части и удаляем пустые элементы
+                const pathParts = urlObj.pathname.split('/').filter(part => part);
+
+                // Проверяем, что это ссылка на видео TikTok
+                if (pathParts.length >= 2 && pathParts[1] === 'video') {
+                    // Ник пользователя (убираем @ если есть)
+                    let username = pathParts[0];
+                    if (username.startsWith('@')) {
+                        username = username.substring(1);
+                    };
+                    // ID видео
+                    const videoId = pathParts[2];
+
+                    return {
+                      username: username,
+                      videoId: videoId,
+                      success: true
+                    };
+                } else {
+                    return {
+                        success: false,
+                        error: 'Неверный формат ссылки TikTok'
+                    }
+                }
+            } catch (error) {
+                    return {
+                    success: false,
+                    error: 'Неверный URL'
+                }
+            }
+        };
+        // tiktok player
+        function createTikTokVideoEmbed(videoData) {
+            // get data from tiktok url
+            var data = parseTikTokUrl(videoData.url);
+            if(!data.success) {console.error('Error with parse Tiktok URL: ' + data.error); return};
+
+            // create tiktok iframe
+            var iframe = document.createElement('iframe');
+            iframe.height = `${videoData.height}px`;
+            iframe.width = `${videoData.width}px`;
+            iframe.src = `https://www.tiktok.com/player/v1/${data.videoId}?&rel=0&progress_bar=0&play_button=0&volume_control=0&fullscreen_button=0&timestamp=0&loop=1&description=0&autoplay=1`;
+            // iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
+            iframe.title = 'tiktok';
+            iframe.style = "display: block;";
+            iframe.frameBorder = "0";
+
+            return iframe
+        };
+        // Удаление элемента видео
+        function removeVideoElement(videoId) {
+            const element = document.getElementById(`video_${videoId}`);
+            if (element) {
+                element.style.opacity = '0';
+                element.style.transform = `${element.style.transform} scale(0.8)`;
+                setTimeout(() => {
+                    if (element.parentNode) {
+                        element.parentNode.removeChild(element);
+                        updateVideoCount();
+                    }
+                }, 300);
+            }
+        };
+        
+        // Очистка всех видео
+        function clearAllVideos() {
+            videoContainer.innerHTML = '';
+            updateVideoCount();
+        };
+        
+        // Обработка WebSocket событий
+        socket.on('connect', () => {
+            console.log('Connected to server');
+            connectionActive = true;
+            statusIndicator.classList.remove('connection-lost');
+            if (debugMode) connectionStatusElement.textContent = 'Connected';
+        });
+        
+        socket.on('disconnect', () => {
+            console.log('Disconnected from server');
+            connectionActive = false;
+            statusIndicator.classList.add('connection-lost');
+            if (debugMode) connectionStatusElement.textContent = 'Disconnected';
+        });
+        
+        socket.on('init', (data) => {
+            console.log('Initial data received:', data.videos.length, 'videos');
+            clearAllVideos();
+            
+            // Добавляем активные видео
+            data.videos.forEach(videoData => {
+                const element = createVideoElement(videoData);
+                if(element) {videoContainer.appendChild(element)};
+            });
+            
+            updateVideoCount();
+        });
+
+        _random_effects = ['row', 'fullscreen']; // 'longlife'
+        
+        socket.on('videoAdded', (videoData) => {
+            // console.log('New video added:', videoData.id);
+            const element = createVideoElement(videoData);
+            // console.log(videoData);
+            if(element) {
+                if(videoData.affected) { // если эффект уже есть - кидаем сразу
+                    videoContainer.appendChild(element)
+                } else {
+                    var effect = 'none';
+                    if(Math.random() < 0.2) {effect = _random_effects[Math.floor(Math.random() * 1.999)]};
+                    console.log("effect: ", effect);
+                    if(effect == 'fullscreen') {
+                        element.style.top = `0px`;
+                        element.style.left = `0px`;
+                        element.style.width = `1920px`;
+                        element.style.height = `1080px`;
+                        element.style.transform = ``;
+                        if(!videoData.isYouTube) {
+                            videoContainer.appendChild(element)
+                        } else {
+                            var vd = videoData;
+                            vd.width = 1920;
+                            vd.height = 1080;
+                            vd.left = 0; vd.top = 0; vd.rotation = 0;
+                            videoContainer.appendChild(createVideoElement(vd));
+                            setTimeout(() => {removeVideoElement(videoData.id);}, 10000);
+                        }
+                    } else if(effect == 'row') {
+                        videoContainer.appendChild(element);
+                        setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 1000);
+                        setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 2000);
+                        if(Math.random() < 0.66) {setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 3000)};
+                        if(Math.random() < 0.33) {setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 4000)};
+                    } else if (effect == 'longlife') {
+                        apiRunVideo(videoData.url, Math.floor(60 + Math.random() * 60), true)
+                    } else if (effect == 'none') {
+                        videoContainer.appendChild(element)
+                    }
+                };
+                updateVideoCount();
+            }
+        });
+        
+        socket.on('videoRemoved', (videoId) => {
+            // console.log('Video removed:', videoId);
+            removeVideoElement(videoId);
+        });
+        
+        socket.on('clearAll', () => {
+            console.log('Clearing all videos');
+            clearAllVideos();
+        });
+        
+        // Автоматическое переподключение
+        setInterval(() => {
+            if (!connectionActive && socket.disconnected) {
+                console.log('Attempting to reconnect...');
+                socket.connect();
+            }
+        }, 5000);
+        
+        // Обновление счетчика каждую секунду в режиме отладки
+        if (debugMode) {
+            setInterval(updateVideoCount, 1000);
+        };
+
+        // Состояние прогресс-бара
+        let pbCount = 0;
+        let pbTotal = 25;
+        let pbEventTime = 31; // +1 time for running memes
+        let pbEventProgress = 0;
+        let pbLastAlerts = [];
+        let pbDefaultTime = 7;
+        let pbTimeout = null;
+        const pbElement = document.getElementById('pbProgressBar');
+        const pbFillElement = document.getElementById('pbBarFill');
+        const pbTextElement = document.getElementById('pbBarText');
+
+        // Функция обновления отображения
+        function pbUpdateDisplay(showtime=pbDefaultTime) {
+            const percentage = Math.min((pbCount / pbTotal) * 100, 100);
+            pbFillElement.style.width = percentage + '%';
+            pbTextElement.textContent = `${pbCount} из ${pbTotal}`;
+
+            // Показываем элемент
+            pbElement.classList.remove('hidden');
+
+            // Сбрасываем предыдущий таймаут
+            if (pbTimeout) {
+                clearTimeout(pbTimeout);
+            };
+    
+            // Устанавливаем новый таймаут для скрытия через 10 секунд
+            pbTimeout = setTimeout(() => {
+                pbElement.classList.add('hidden');
+                pbTimeout = null;
+            }, showtime*1000);
+        };
+
+        // Функция добавления значения к прогрессу
+        function pbAddToCount(value) {
+            if(pbEventProgress > 0) {return}; // skip if event running
+            pbCount += value;
+
+            // Проверка на достижение или превышение лимита
+            if (pbCount >= pbTotal) {
+                pbCount = pbTotal;
+                localStorage.setItem(HIST_PB_COUNT_KEY, '0');
+                pbUpdateDisplay(pbEventTime+12);
+                pbOnComplete();
+            } else {
+                localStorage.setItem(HIST_PB_COUNT_KEY, String(pbCount));
+                pbUpdateDisplay();
+            }
+        };
+
+        // Функция, вызываемая при завершении
+        function pbOnComplete() {
+            console.log('Прогресс завершен! Счетчик обнулен.');
+            // запускаем мем пушку
+            pbEventProgress = +pbEventTime;
+            pbLastAlerts = histGetAllText();
+            pbDeployRandomAlerts();
+            // Обнуляем счетчик на всякий
+            pbCount = 0;
+        };
+
+        function pbRandomAlert() {
+            return pbLastAlerts[Math.floor(Math.random() * (pbLastAlerts.length - 0.001))]
+        };
+
+        function pbDeployRandomAlerts() {
+            pbEventProgress -= 1;
+            if(pbEventProgress > 1) {
+                if(Math.random() < 0.7) {apiRunVideo(pbRandomAlert(), 10, true)};
+                if(Math.random() < 0.4) {apiRunVideo(pbRandomAlert(), 8, true)};
+                // if(Math.random() < 0.4) {apiRunVideo(pbRandomAlert(), 10, true)};
+                setTimeout(() => {pbDeployRandomAlerts()}, 1000)
+            } else {
+                setTimeout(() => {pbEventProgress = 0; pbSetProgress(0, pbTotal)}, 5*1000);
+            }
+        };
+
+        // Функция ручной установки значений
+        function pbSetProgress(count, total) {
+            pbCount = count;
+            pbTotal = total;
+            localStorage.setItem(HIST_PB_COUNT_KEY, String(count));
+            localStorage.setItem(HIST_PB_TOTAL_KEY, String(total));
+            pbUpdateDisplay(5);
+        };
+
+        // Функция сброса прогресса
+        function pbReset() {
+            pbCount = 0;
+            localStorage.setItem(HIST_PB_COUNT_KEY, '0');
+            pbUpdateDisplay(5);
+        };
+
+        setTimeout(() => {pbUpdateDisplay(10)}, 1000); // первое отображение при запуске
+
+        // контроль через апи сервера
+        socket.on('pbShow', () => {pbUpdateDisplay(5)});
+
+        socket.on('pbSetValues', (values) => {
+            pbSetProgress(values.count, values.total)
+        });
+
+        //
+        // ИСТОРИЯ МЕМОВ
+        //
+        const HIST_MAX = 25; // Максимальное количество хранимых сообщений
+        const HIST_STORAGE_KEY = 'histMessages';
+        const HIST_PB_COUNT_KEY = 'histLastPBCount';
+        const HIST_PB_TOTAL_KEY = 'histLastPBTotal';
+
+        // Инициализация истории при загрузке
+        function histInitialize() {
+            if (!localStorage.getItem(HIST_STORAGE_KEY)) {
+                localStorage.setItem(HIST_STORAGE_KEY, JSON.stringify([]));
+            };
+            if (!localStorage.getItem(HIST_PB_COUNT_KEY)) {
+                localStorage.setItem(HIST_PB_COUNT_KEY, '0');
+            };
+            if (!localStorage.getItem(HIST_PB_TOTAL_KEY)) {
+                localStorage.setItem(HIST_PB_TOTAL_KEY, '0');
+            };
+        };
+        // Инициализация при загрузке
+        histInitialize();
+
+        // загрузка PB переменных из памяти
+        pbCount = +localStorage.getItem(HIST_PB_COUNT_KEY);
+        pbTotal = +localStorage.getItem(HIST_PB_TOTAL_KEY);
+
+        // Функция добавления нового сообщения в историю
+        function histAdd(message) {
+            if(typeof message != "string") {return};
+            // Получаем текущую историю
+            let history = histGetAll();
+
+            // Добавляем новое сообщение с временной меткой
+            const newEntry = {
+                text: message,
+            };
+
+            // проверка на повтор
+            for(let i=0; i<history.length; i++) {
+                if(history[i].text == newEntry.text) {return}
+            };
+
+            // Проверяем, нужно ли перезаписывать
+            if (history.length >= HIST_MAX) {
+                // Выбираем случайный индекс для замены
+                const randomIndex = Math.floor(Math.random() * history.length);
+                history[randomIndex] = newEntry;
+            } else {
+                // Просто добавляем новое сообщение
+                history.push(newEntry);
+            };
+
+            // Сохраняем обновленную историю
+            localStorage.setItem(HIST_STORAGE_KEY, JSON.stringify(history));
+
+            return history;
+        };
+
+        // Функция получения всей истории
+        function histGetAll() {
+            const historyJson = localStorage.getItem(HIST_STORAGE_KEY);
+            if (!historyJson) {
+                return [];
+            };
+
+            try {
+                return JSON.parse(historyJson);
+            } catch (e) {
+                console.error('Ошибка парсинга истории:', e);
+                return [];
+            }
+        };
+
+        // Функция получения истории в виде массива строк (без метаданных)
+        function histGetAllText() {
+            return histGetAll().map(entry => entry.text);
+        };
+
+        // Функция очистки истории
+        function histClear() {
+            localStorage.setItem(HIST_STORAGE_KEY, JSON.stringify([]));
+        };
+        // 
+        // debug assets
+        //
+        debugMemealertURL = 'https://cdns.memealerts.com/p/64e0ffc90ea4a1112723d1ee/fd020ee4-7ecd-40ad-804d-ff1722f3384a/alert_orig.webm';
+        
+        // Клик для тестирования (только в режиме отладки)
+        if (debugMode) {
+            document.body.addEventListener('click', (e) => {
+                if (e.target === document.body) {
+                    // Тестовый запрос на добавление видео
+                    fetch('/api/runVideo', {
+                        method: 'POST',
+                        headers: {'Content-Type': 'application/json'},
+                        body: JSON.stringify({
+                            videoUrl: debugMemealertURL
+                        })
+                    })
+                }
+            })
+        };
+        // функция для запуска разных видео
+        function apiRunVideo(url = debugMemealertURL, lifetime=30, affected=false) {
+            fetch('/api/runVideo', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({
+                    videoUrl: String(url),
+                    lifetime: lifetime*1000,
+                    affected: affected
+                })
+            })
+        };
+        // функция для запуска "застрявших" видеоэлементов
+        // function debugPlayStoppedVideos() {
+        //     videoContainer.querySelectorAll('video').forEach((video) => {
+        //         if(video.paused) {video.play()}
+        //     });
+        // };
+        // setInterval(debugPlayStoppedVideos, 3000); // раз в 3 секунды
+    </script>
+</body>
+</html>
