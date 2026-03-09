@@ -8,6 +8,20 @@ const app = express();
 const server = http.createServer(app);
 const io = socketIo(server);
 
+// init create directories
+const _logsDir = path.join(__dirname, 'logs'); // create 'logs' folder
+if (!fs.existsSync(_logsDir)) {
+    fs.mkdirSync(_logsDir);
+};
+const _downloadsDir = path.join(__dirname, 'downloads'); // create 'logs' folder
+if (!fs.existsSync(_downloadsDir)) {
+    fs.mkdirSync(_downloadsDir);
+};
+const _tempDir = path.join(__dirname, 'temp');
+if (!fs.existsSync(_tempDir)) {
+    fs.mkdirSync(_tempDir);
+}
+
 //
 // ЛОГИРОВАНИЕ (ПЕРЕХВАТОМ ДЕФОЛТ ФУНКЦИЙ)
 //
@@ -115,32 +129,6 @@ app.use(cors({
     allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
-const streamId = null;
-
-let browser, page;
-let msgIteration = 0;
-let lastMessage = "";
-
-// monitorChat();
-// async function monitorChat() {
-//     browser = await puppeteer.launch({headless: true});
-
-//     // var aboba = 100
-//     // while(aboba>0) {
-//     //     var page = await browser.newPage();
-//     //     await page.goto('https://gate-dzgas.com/s23');
-//     //     await page.click("#age-deny")
-//     //     // await page.click("#filter-chat-button")
-//     //     aboba--
-//     // }
-
-//     page = await browser.newPage();
-//     await page.goto('https://gate-dzgas.com/');
-//     await page.click("#age-deny");
-
-//     setTimeout(checkChat, 3000)
-// };
-
 // TWITCH LOGIC
 
 const WebSocket = require('ws');
@@ -246,71 +234,6 @@ async function tiktokWorker(url) {
     fetchVideo(data.data.play)
 }; 
 
-// GATE LOGIC
-
-// async function checkChat() {
-//         console.clear();
-//         console.log("getting messages, iteration:", msgIteration);
-//         var selection = await page.$$('div > .message');
-//         if(!selection) {return};
-//         if(selection.length <= 1) {return};
-//         var content = await selection[selection.length-1].$$('div');
-//         if(content.length >=2) {
-//             var stream = await content[0].evaluate(el => el.textContent, content[0]);
-//             var msg = await content[1].evaluate(el => el.textContent, content[1]);
-//             var url = await content[1].$('a');
-//             // check url
-//             var href = false;
-//             if(url) {
-//                 var href = await url.evaluate(el => el.href, url);
-//                 console.log("full first url:", href)
-//             };
-//             console.log("user message, stream:", stream);
-//             console.log("text:", msg);
-//             var fullmsg = msg + String(href);
-//             // execute commands
-//             if(lastMessage != fullmsg) {
-//                 lastMessage = String(fullmsg);
-//                 // skip, if stream specified
-//                 if(streamId == null || streamId == stream) {
-//                     if(msg.includes("!ma ", 0)) {
-//                         console.log('\nCommand: Meme')
-//                         // first text
-//                         var msgsplit = msg.split(" ");
-//                         // if(msgsplit.length > 1) {
-//                         //     console.log('Text:', msgsplit[1])
-//                         // };
-//                         // first url
-//                         if(href) {console.log('URL:', href)};
-//                         // request
-//                         if(msgsplit.length > 2) {
-//                             if(String(Number(msgsplit[2])) != 'NaN') {
-//                                 var count = Number(msgsplit[2]);
-//                                 count = count <= 0 ? 1 : count > 10 ? 10 : Math.round(count);
-//                                 for(let i=0; i<count; i++) {
-//                                     setTimeout(() => {
-//                                         fetchVideo(href)
-//                                     }, 500*i);
-//                                 }
-//                             } else {
-//                                 fetchVideo(href)
-//                             }
-//                         } else {
-//                             fetchVideo(href)
-//                         }
-//                     }
-//                 }
-//             }
-//         } else {
-//             var msg = await content[0].evaluate(el => el.textContent, content[1]);
-//             console.log("system message");
-//             console.log("text:", msg)
-//         };
-//         //
-//         msgIteration++;
-//         setTimeout(() => {checkChat()}, 500);
-// };
-
 function fetchVideo(href) {
     fetch('http://localhost:3000/api/runVideo', {
         method: 'POST',
@@ -330,16 +253,10 @@ const VIDEO_MAX_DURATION = 30000; // в миллисекундах
 let activeVideos = [];
 // let videoIdCounter = 1;
 
-// Создаем папку для временных файлов если нет
-const tempDir = path.join(__dirname, 'temp');
-if (!fs.existsSync(tempDir)) {
-    fs.mkdirSync(tempDir);
-}
-
 // Middleware
 app.use(express.json());
 app.use(express.static('public'));
-app.use('/temp', express.static(tempDir));
+app.use('/temp', express.static(_tempDir));
 
 // Страница для OBS
 app.get('/', (req, res) => {
@@ -496,15 +413,18 @@ app.post('/api/pbSetValues', (req, res) => {
 });
 
 // псевдосообщения (типо с твича)
-app.get('/api/pseudoMessage', async (req, res) => {
+app.post('/api/pseudoMessage', async (req, res) => {
     try {
-        const { message } = req.body;
+        const { message, username } = req.body;
         
         if (!message) {
             return res.status(400).json({ error: 'message is required' });
         };
+        var user = username ? username : 'TESTER';
 
-        twitchMessage('=TESTER=', String(message))
+        twitchMessage(user, String(message));
+        res.json({success: true, message: 'pseudo twitch message sended'})
+
     } catch(error) {
         console.error('Error send pseudo message:', error);
         res.status(500).json({ error: error.message });

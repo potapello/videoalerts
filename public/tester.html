@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Meme Tester</title>
+    <title>Videoalerts Manager</title>
     <style>
         * {
             margin: 0;
@@ -341,7 +341,7 @@
 </head>
 <body>
     <div class="container">
-        <h1>🎬 Meme Tester</h1>
+        <h1>🎬 Videoalerts Manager</h1>
 
         <!-- Status messages -->
         <div id="messageContainer"></div>
@@ -369,6 +369,19 @@
             <button id="runVideoBtn">Запустить видео</button>
             <div style="margin-top: 15px; color: #888; font-size: 12px;">
                 <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, affected 
+            </div>
+        </div>
+
+        <!-- Отправка псевдосообщения -->
+        <div class="card">
+            <h2>🚀 Отправка псевдосообщения</h2>
+            <div class="form-group">
+                <input type="text" id="messageText" placeholder="!ma *url* ...args" value="!ma ">
+            </div>
+
+            <button id="pseudoMessageBtn">Отправить</button>
+            <div style="margin-top: 15px; color: #888; font-size: 12px;">
+                <span class="detail-tag">POST /api/pseudoMessage</span> required: message; optional: username 
             </div>
         </div>
 
@@ -459,6 +472,9 @@
         const videosList = document.getElementById('videosList');
         const videosCount = document.getElementById('videosCount');
 
+        const pseudoMessageBtn = document.getElementById('pseudoMessageBtn');
+        const messageText = document.getElementById('messageText');
+
         // Состояние для долгого нажатия
         let pressTimer = null;
         let isPressing = false;
@@ -516,6 +532,31 @@
                 console.error('Error:', error);
             }
         }
+
+        async function pseudoMessage() {
+            const msg = String(messageText.value);
+
+            try {
+                const response = await fetch(`${SERVER_URL}/api/pseudoMessage`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({message: msg})
+                });
+
+                if (!response.ok) {
+                    throw new Error(`HTTP error! status: ${response.status}`);
+                }
+
+                const result = await response.json();
+                showMessage(`Псевдосообщение отправлено.`, 'success');
+
+            } catch (error) {
+                showMessage(`Ошибка отправки псевдосообщения: ${error.message}`, 'error');
+                console.error('Error:', error);
+            }
+        };
 
         // Остановка всех видео
         async function stopAllVideos() {
@@ -708,6 +749,7 @@
         // Обработчики для других кнопок
         runVideoBtn.addEventListener('click', runVideo);
         refreshVideosBtn.addEventListener('click', fetchActiveVideos);
+        pseudoMessageBtn.addEventListener('click', pseudoMessage);
 
         // Обработка клавиши Enter в поле ввода
         videoUrl.addEventListener('keypress', (e) => {

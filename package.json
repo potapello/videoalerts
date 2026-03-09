@@ -1,7 +1,7 @@
 {
-  "name": "obs-freememealerts-potapello",
-  "version": "1.0.0",
-  "description": "OBS free Memealerts+ for streams (by potapello)",
+  "name": "videoalerts-potapello",
+  "version": "0.3.0",
+  "description": "Videoalerts for Twitch streams",
   "main": "main.js",
   "scripts": {
     "start": "node main.js",
@@ -11,6 +11,7 @@
   "dependencies": {
     "express": "^4.18.2",
     "puppeteer": "24.15.0",
+    "socket": "^1.1.67",
     "socket.io": "^4.7.2",
     "tmi": "^2.0.0",
     "tmi.js": "^1.8.5",
