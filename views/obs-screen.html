@@ -1,9 +1,9 @@
 <!DOCTYPE html>
-<html lang="en">
+<html>
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>OBS Video Screen</title>
+    <title>Videoalerts Screen</title>
     <style>
         * {
             margin: 0;
@@ -29,8 +29,8 @@
         }
         
         .video-container video {
-            width: 100%;
-            height: 100%;
+            /* width: 100%;
+            height: 100%; */
             object-fit: cover;
             display: block;
         }
@@ -140,6 +140,25 @@
             z-index: 1;
             white-space: nowrap;
         }
+
+        .rotate-animation {
+            animation: rotate 3s linear infinite;
+        }
+
+        @keyframes rotate {
+            from {
+                transform: rotate(0deg);
+            }
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .fullscreen_modifier {
+            position: absolute;
+            left: 50%;
+            transform: translateX(-50%);
+        }
     </style>
 </head>
 <body>
@@ -188,7 +207,7 @@
         };
         
         // Создание элемента видео
-        function createVideoElement(videoData) {
+        function createVideoElement(videoData, skipPB=false) {
             var container = document.createElement('div');
             container.className = 'video-container';
             container.id = `video_${videoData.id}`;
@@ -206,9 +225,15 @@
             const video = document.createElement('video');
             video.autoplay = true;
             // video.muted = false; // Включаем звук
+
+            // автоподстройка размеров видеоэлемента
+            // setTimeout(() => {
+            //     if(video.clientHeight > video.clientWidth) {video.height = videoData.height} else {video.height = videoData.height}
+            // }, 2000);
+            video.oncanplay = () => {if(video.clientHeight > video.clientWidth) {video.height = videoData.height} else {video.height = videoData.height}};
             
             // ютуб хуита
-            if(videoData.isYouTube) {
+            if(videoData.type == 'yt') {
                 // разлок высоты для шортов
                 if(videoData.url.includes('/shorts/')) {
                     container.style.maxHeight = ``;
@@ -218,16 +243,44 @@
                 if(yvid === undefined) {return}
                 else {container.innerHTML = yvid}
 
-            // остальные
+            // тикиток картинки
+            } else if(videoData.type == 'tti') {
+                const data = JSON.parse(videoData.url);
+
+                const music = document.createElement('audio');
+                music.autoplay = true;
+                music.controls = false;
+                music.loop = true;
+                music.volume = videoData.volume;
+                music.src = String(data.play);
+                container.appendChild(music);
+
+                if(data.images) {
+                    const image = new Image();
+                    image.src = data.images[0];
+                    image.style.maxHeight = `${videoData.height}px`;
+                    image.style.maxWidth = `${videoData.width}px`;
+                    image.style.objectFit = 'contain';
+
+                    if(data.images.length > 1) {
+                        var count = Math.min(Math.floor(videoData.duration/2500), data.images.length);
+                        var qtime = Math.floor(videoData.duration / count);
+                        for(let i = 1; i < count; i++) {
+                            if(data.images[i]) {setTimeout(() => {image.src = data.images[i]}, qtime * i)} else {break}
+                        };
+                    };
+                    container.appendChild(image)
+                };
+            // остальные  
             } else {
                 video.src = videoData.url;
                 video.volume = videoData.volume;
 
-                if(videoData.isTiktok) {
+                if(videoData.type == 'tt') {
                     video.loop = true;
-                    container.style.maxHeight = ``;
+                    // container.style.maxHeight = ``;
                 } else {
-                    video.loop = false;
+                    video.loop = videoData.effect == 'longlife';
                     // Обработка конца видео
                     video.onended = function() {
                         removeVideoElement(videoData.id);
@@ -235,12 +288,12 @@
                 }
                 
                 container.appendChild(video);
-                
-                // Автоматическое удаление через (на всякий случай)
-                setTimeout(() => {
-                    removeVideoElement(videoData.id);
-                }, videoData.duration);
             };
+
+            // Автоматическое удаление через (на всякий случай)
+            setTimeout(() => {
+                removeVideoElement(videoData.id);
+            }, videoData.duration);
             
             // Добавляем оверлей для отладки
             if (debugMode) {
@@ -251,10 +304,14 @@
                 container.appendChild(overlay);
             };
 
-            if(!videoData.affected) {
-                pbAddToCount(1);
-                histAdd(videoData.url)
+            if(!skipPB) {
+                if(!videoData.affected) {
+                    pbAddToCount(1);
+                    histAdd(videoData.url)
+                };
+                if(videoData.modifier) {pbAddToCount(1)}
             };
+
             return container
         };
 
@@ -266,12 +323,9 @@
         };
 
         // Функция для создания URL embed
-        function getYouTubeEmbedUrl(url, isShort = false) {
+        function getYouTubeEmbedUrl(url) {
             const videoId = getYouTubeVideoId(url);
-            if (!videoId) return null;
-            const baseUrl = 'https://www.youtube-nocookie.com/embed/';
-            if (isShort) {return `${baseUrl}${videoId}?playsinline=1`}
-            return `${baseUrl}${videoId}`;
+            return videoId ? 'https://www.youtube-nocookie.com/embed/' + videoId : null;
         };
 
         // Основная логика
@@ -279,28 +333,16 @@
             // Проверяем, является ли видео shorts
             const isShort = videoData.url.includes('/shorts/');
             // Получаем embed URL
-            const embedUrl = getYouTubeEmbedUrl(videoData.url, isShort);
+            const embedUrl = getYouTubeEmbedUrl(videoData.url);
             if (!embedUrl) {console.error('Invalid YouTube URL'); return};
             // Параметры для iframe
             let params = new URLSearchParams();
-            // Общие параметры
-            params.append('rel', '0'); // Не показывать похожие видео
-            params.append('modestbranding', '1'); // Минимальный брендинг
-            // Для обычных видео
-            if (!isShort) {
-                params.append('autoplay', '1');
-                params.append('controls', '0');
-                // params.append('mute', '1'); // Важно: видео должно быть с заглушенным звуком для автозапуска
-                params.append('playsinline', '1');
-            }
-            // Для shorts
-            else {
-                params.append('autoplay', '1');
-                params.append('controls', '0');
-                // params.append('mute', '1');
-                params.append('playsinline', '1');
-                params.append('loop', '1');
-            };
+            params.append('rel', '0');
+            params.append('modestbranding', '1');
+            params.append('autoplay', '1');
+            params.append('controls', '0');
+            params.append('playsinline', '1');
+            if(isShort) {params.append('loop', '1')};
             // Создаем iframe
             return `
                 <iframe 
@@ -314,60 +356,7 @@
                     title="YouTube video player">
                 </iframe>`;
         };
-        // tiktok get videodata for embed
-        function parseTikTokUrl(url) {
-            try {
-                // Создаем объект URL для парсинга
-                const urlObj = new URL(url);
-                // Разбиваем pathname на части и удаляем пустые элементы
-                const pathParts = urlObj.pathname.split('/').filter(part => part);
 
-                // Проверяем, что это ссылка на видео TikTok
-                if (pathParts.length >= 2 && pathParts[1] === 'video') {
-                    // Ник пользователя (убираем @ если есть)
-                    let username = pathParts[0];
-                    if (username.startsWith('@')) {
-                        username = username.substring(1);
-                    };
-                    // ID видео
-                    const videoId = pathParts[2];
-
-                    return {
-                      username: username,
-                      videoId: videoId,
-                      success: true
-                    };
-                } else {
-                    return {
-                        success: false,
-                        error: 'Неверный формат ссылки TikTok'
-                    }
-                }
-            } catch (error) {
-                    return {
-                    success: false,
-                    error: 'Неверный URL'
-                }
-            }
-        };
-        // tiktok player
-        function createTikTokVideoEmbed(videoData) {
-            // get data from tiktok url
-            var data = parseTikTokUrl(videoData.url);
-            if(!data.success) {console.error('Error with parse Tiktok URL: ' + data.error); return};
-
-            // create tiktok iframe
-            var iframe = document.createElement('iframe');
-            iframe.height = `${videoData.height}px`;
-            iframe.width = `${videoData.width}px`;
-            iframe.src = `https://www.tiktok.com/player/v1/${data.videoId}?&rel=0&progress_bar=0&play_button=0&volume_control=0&fullscreen_button=0&timestamp=0&loop=1&description=0&autoplay=1`;
-            // iframe.allow = 'accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture';
-            iframe.title = 'tiktok';
-            iframe.style = "display: block;";
-            iframe.frameBorder = "0";
-
-            return iframe
-        };
         // Удаление элемента видео
         function removeVideoElement(videoId) {
             const element = document.getElementById(`video_${videoId}`);
@@ -410,57 +399,108 @@
             
             // Добавляем активные видео
             data.videos.forEach(videoData => {
-                const element = createVideoElement(videoData);
-                if(element) {videoContainer.appendChild(element)};
+                videoAddWorker(videoData, true)
             });
-            
-            updateVideoCount();
         });
 
-        _random_effects = ['row', 'fullscreen']; // 'longlife'
-        
-        socket.on('videoAdded', (videoData) => {
-            // console.log('New video added:', videoData.id);
-            const element = createVideoElement(videoData);
-            // console.log(videoData);
+        socket.on('videoAdded', videoAddWorker);
+
+        function videoAddWorker(videoData, skipPB=false) {
+            const element = createVideoElement(videoData, skipPB);
             if(element) {
-                if(videoData.affected) { // если эффект уже есть - кидаем сразу
-                    videoContainer.appendChild(element)
-                } else {
-                    var effect = 'none';
-                    if(Math.random() < 0.2) {effect = _random_effects[Math.floor(Math.random() * 1.999)]};
-                    console.log("effect: ", effect);
-                    if(effect == 'fullscreen') {
-                        element.style.top = `0px`;
-                        element.style.left = `0px`;
-                        element.style.width = `1920px`;
-                        element.style.height = `1080px`;
-                        element.style.transform = ``;
-                        if(!videoData.isYouTube) {
-                            videoContainer.appendChild(element)
-                        } else {
-                            var vd = videoData;
-                            vd.width = 1920;
-                            vd.height = 1080;
-                            vd.left = 0; vd.top = 0; vd.rotation = 0;
-                            videoContainer.appendChild(createVideoElement(vd));
-                            setTimeout(() => {removeVideoElement(videoData.id);}, 10000);
-                        }
-                    } else if(effect == 'row') {
-                        videoContainer.appendChild(element);
-                        setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 1000);
-                        setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 2000);
-                        if(Math.random() < 0.66) {setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 3000)};
-                        if(Math.random() < 0.33) {setTimeout(() => {apiRunVideo(videoData.url, 10, true)}, 4000)};
-                    } else if (effect == 'longlife') {
-                        apiRunVideo(videoData.url, Math.floor(60 + Math.random() * 60), true)
-                    } else if (effect == 'none') {
+                // setup effects
+                if(videoData.affected || videoData.type == 'tti') { // если эффект уже есть - кидаем сразу
+                    if(videoData.modifier) {
+                        console.log('video modifier:', videoData.modifier);
+                        appendModifierOnElement(element, videoData)
+                    } else {
                         videoContainer.appendChild(element)
                     }
+                } else {
+                    if(videoData.effect != 'none') {
+                        appendEffectOnElement(element, videoData);
+                        console.log("Video effect:", videoData.effect)
+                    } else {
+                        videoContainer.appendChild(element)
+                    }
+
                 };
                 updateVideoCount();
             }
-        });
+        };
+        // random effects
+        function appendEffectOnElement(element = new HTMLDivElement(), videoData) {
+            videoData.affected = true;
+            if(videoData.effect == 'fullscreen') {
+                element.style.transform = ``;
+                element.style.top = `0px`;
+                element.style.left = `0px`;
+                element.style.maxWidth = `1920px`;
+                element.style.maxHeight = `1080px`;
+                if(videoData.type != 'yt') {
+                    var media = element.getElementsByTagName('video')[0];
+                    media.style.height = '1080px';
+                    setTimeout(() => {element.style.left = `${Math.floor(1920/2 - element.clientWidth/2)}px`}, 1000);
+                    videoContainer.appendChild(element);
+                } else {
+                    var vd = videoData;
+                    vd.width = 1920;
+                    vd.height = 1080;
+                    vd.left = 0; vd.top = 0; vd.rotation = 0;
+                    videoContainer.appendChild(createVideoElement(vd, true));
+                    setTimeout(() => {removeVideoElement(videoData.id);}, 15000);
+                }
+            } else if(videoData.effect == 'row') {
+                videoContainer.appendChild(element);
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1000);
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 2000);
+                if(Math.random() < 0.66) {setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 3000)};
+                if(Math.random() < 0.33) {setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 4000)};
+            } else if (videoData.effect == 'longlife') {
+                    try {element.removeChild(element.getElementsByTagName('video')[0])} catch(e) {}; // костыль против какоготохуя играющего саунда вне контейнера
+                    fetch(`http://localhost:3000/api/stopVideo/${videoData.id}`, {method: 'POST'});
+                    apiRunVideo(videoData, {lifetime: Math.floor(60000 + Math.random() * 60000), affected: true})
+            } else if (videoData.effect == 'slower' || videoData.effect == 'faster') {
+                var media = element.getElementsByTagName('video')[0];
+
+                if(media) {
+                    media.preservesPitch = false;
+                    media.playbackRate = videoData.effect == 'slower' ? 0.7 : 1.5
+                };
+
+                videoContainer.appendChild(element)
+            } else if(videoData.effect == 'rotate') {
+                element.classList.add('rotate-animation');
+                videoContainer.appendChild(element)
+            }
+        };
+        // modifiers by users
+        function appendModifierOnElement(element, videoData) {
+            var modifier = videoData.modifier.split(' ');
+            // position
+            if(modifier[0] == 'pos') {
+                element.style.transform = ``;
+                element.style.left = `${modifier[1] < 0 ? 0 : modifier[1] > 1920 ? 1920 : modifier[1]}px`;
+                element.style.top = `${modifier[2] < 0 ? 0 : modifier[2] > 1080 ? 1080 : modifier[2]}px`;
+                videoContainer.appendChild(element);
+            // effects
+            } else if(modifier[0] == 'slower' || modifier[0] == 'faster' || modifier[0] == 'speed') {
+                var media = element.getElementsByTagName('video')[0];
+                media = media ? media : element.getElementsByTagName('audio')[0];
+                if(media) {
+                    media.preservesPitch = false;
+                    if(modifier[0] == 'faster') {media.playbackRate = 1.5}
+                    else if(modifier[0] == 'slower') {media.playbackRate = 0.7}
+                    else if(modifier[0] == 'speed') {media.playbackRate = modifier[1]};
+                };
+                videoContainer.appendChild(element)
+            } else if(modifier[0] == 'rotate') {
+                element.classList.add('rotate-animation');
+                videoContainer.appendChild(element)
+            } else {
+                videoContainer.appendChild(element)
+            }
+        };
         
         socket.on('videoRemoved', (videoId) => {
             // console.log('Video removed:', videoId);
@@ -549,13 +589,17 @@
         function pbRandomAlert() {
             return pbLastAlerts[Math.floor(Math.random() * (pbLastAlerts.length - 0.001))]
         };
+        var _randomalertseffects = ['rotate', 'none', 'slower', 'none', 'faster'];
+        var _randomalertsgeteff = () => _randomalertseffects[Math.floor(Math.random() * (_randomalertseffects - 0.001))];
 
         function pbDeployRandomAlerts() {
             pbEventProgress -= 1;
             if(pbEventProgress > 1) {
-                if(Math.random() < 0.7) {apiRunVideo(pbRandomAlert(), 10, true)};
-                if(Math.random() < 0.4) {apiRunVideo(pbRandomAlert(), 8, true)};
-                // if(Math.random() < 0.4) {apiRunVideo(pbRandomAlert(), 10, true)};
+                var eff = _randomalertsgeteff();
+                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: eff=='none', effect: eff, type: undefined})};
+                eff = _randomalertsgeteff();
+                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: eff=='none', effect: eff, type: undefined})};
+                // if(Math.random() < 0.4) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: true, effect: 'none', type: undefined})};
                 setTimeout(() => {pbDeployRandomAlerts()}, 1000)
             } else {
                 setTimeout(() => {pbEventProgress = 0; pbSetProgress(0, pbTotal)}, 5*1000);
@@ -691,14 +735,16 @@
             })
         };
         // функция для запуска разных видео
-        function apiRunVideo(url = debugMemealertURL, lifetime=30, affected=false) {
+        function apiRunVideo(vd, changes = {}) {
             fetch('/api/runVideo', {
                 method: 'POST',
                 headers: {'Content-Type': 'application/json'},
                 body: JSON.stringify({
-                    videoUrl: String(url),
-                    lifetime: lifetime*1000,
-                    affected: affected
+                    videoUrl: changes.url !== undefined ? changes.url : vd.url,
+                    type: changes.type !== undefined ? changes.type : vd.type,
+                    lifetime: changes.lifetime !== undefined ? changes.lifetime : vd.lifetime,
+                    affected: changes.affected !== undefined ? changes.affected : vd.affected,
+                    effect: changes.effect !== undefined ? changes.effect : vd.effect,
                 })
             })
         };

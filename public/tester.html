@@ -253,6 +253,11 @@
             color: #e0e0e0;
         }
 
+        .delete-video {
+            background: #3a0505;
+            color: #f00;
+        }
+
         .detail-tag.affected {
             background: #bb86fc33;
             color: #bb86fc;
@@ -361,20 +366,30 @@
 
             <div class="form-group">
                 <div class="checkbox-group">
-                    <input type="checkbox" id="affected">
-                    <label for="affected">Без эффектов</label>
+                    <!-- <input type="checkbox" id="affected"> -->
+                    <label for="affected">Наложенный эффект</label>
+                    <select name="birds" id="affected">
+                        <option value="random" selected>Случайный (по умолчанию)</option>
+                        <option value="affected">Без эффекта</option>
+                        <option value="row">Спам</option>
+                        <option value="fullscreen">Фулскрин</option>
+                        <option value="longlife">Продление</option>
+                        <option value="slower">Замедление</option>
+                        <option value="faster">Ускорение</option>
+                        <option value="rotate">Вращение</option>
+                    </select>
                 </div>
             </div>
 
             <button id="runVideoBtn">Запустить видео</button>
             <div style="margin-top: 15px; color: #888; font-size: 12px;">
-                <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, affected 
+                <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, affected, type 
             </div>
         </div>
 
         <!-- Отправка псевдосообщения -->
         <div class="card">
-            <h2>🚀 Отправка псевдосообщения</h2>
+            <h2>✉ Отправка псевдосообщения</h2>
             <div class="form-group">
                 <input type="text" id="messageText" placeholder="!ma *url* ...args" value="!ma ">
             </div>
@@ -399,7 +414,7 @@
 
         <!-- Управление прогрессбаром -->
         <div class="card">
-            <h2>📊 Управление прогрессбаром</h2>
+            <h2>📏 Управление прогрессбаром</h2>
         
             <!-- Блок установки значений -->
             <div style="display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 5px; align-items: flex-end;">
@@ -440,7 +455,7 @@
                 <button id="refreshVideosBtn">🔄 Обновить список</button>
             </div>
             <div style="margin-top: 15px; color: #888; font-size: 12px;">
-                <span class="detail-tag">POST /api/activeVideos</span> no args 
+                <span class="detail-tag">GET /api/activeVideos</span> no args 
             </div>
 
             <div class="active-videos" id="videosList">
@@ -464,7 +479,7 @@
         const lifetime = document.getElementById('lifetime');
         const lifetimeValue = document.getElementById('lifetimeValue');
         const affected = document.getElementById('affected');
-        affected.checked = true;
+        // affected.checked = true;
         const runVideoBtn = document.getElementById('runVideoBtn');
         const stopAllBtn = document.getElementById('stopAllBtn');
         const stopHint = document.getElementById('stopHint');
@@ -502,10 +517,20 @@
                 return;
             }
 
-            const data = {
+            var data = {
                 videoUrl: url,
+                type: undefined,
                 lifetime: parseInt(lifetime.value * 1000),
-                affected: affected.checked
+                affected: false,
+                effect: 'none'
+            };
+
+            // get effect
+            var effect = String(affected.value);
+            if(effect == 'affected') {
+                data.affected = true
+            } else if(effect != 'random') {
+                data.effect = effect
             };
 
             try {
@@ -693,11 +718,23 @@
                         <div class="video-url">📹 ${truncateUrl(video.url)}</div>
                         <div class="video-details">
                             <span class="detail-tag">⏱️ ${video.duration} мс</span>
+                            ${video.type == 'yt' ? '<span class="detail-tag">🎥 YouTube</span>' : ''}
+                            ${video.type == 'ma' ? '<span class="detail-tag">💾 Raw Video</span>' : ''}
+                            ${video.type == 'tt' ? '<span class="detail-tag">📱 Tiktok</span>' : ''}
+                            ${video.type == 'tti' ? '<span class="detail-tag">📟 TiktokImage</span>' : ''}
+
                             <span class="detail-tag ${video.affected ? 'affected' : ''}">
-                                ${video.affected ? '⚠️ Affected' : '✓ Normal'}
+                                ${video.affected ? '💡 Affected' : '✓ Normal'}
                             </span>
-                            ${video.isYouTube ? '<span class="detail-tag">📺 YouTube</span>' : ''}
-                            ${video.isLocal ? '<span class="detail-tag">💾 Local</span>' : ''}
+                            ${video.effect == 'row' ? '<span class="detail-tag">🧮 Спам</span>' : ''}
+                            ${video.effect == 'fullscreen' ? '<span class="detail-tag">📺 Фулскрин</span>' : ''}
+                            ${video.effect == 'longlife' ? '<span class="detail-tag">🔋 Продление</span>' : ''}
+                            ${video.effect == 'slower' ? '<span class="detail-tag">⬅ Замедление</span>' : ''}
+                            ${video.effect == 'faster' ? '<span class="detail-tag">➡ Ускорение</span>' : ''}
+                            ${video.effect == 'rotate' ? '<span class="detail-tag">🔃 Вращение</span>' : ''}
+
+                            ${video.modifier ? `<span class="detail-tag">⚙ Мод "${video.modifier}"</span>` : ''}
+                            <button class="detail-tag delete-video" onclick="btnVideoDelete('${video.id}')">Удалить</button>
                         </div>
                     </div>
                 `;
@@ -708,8 +745,8 @@
 
         // Обрезка длинного URL
         function truncateUrl(url) {
-            if (url.length > 50) {
-                return url.substring(0, 30) + '...' + url.substring(url.length - 20);
+            if (url.length > 120) {
+                return url.substring(0, 30) + '...' + url.substring(url.length - 85);
             }
             return url;
         }
@@ -744,7 +781,21 @@
             isPressing = false;
             stopAllBtn.classList.remove('pressed');
             stopHint.textContent = 'или нажми с зажатым Ctrl';
-        }
+        };
+
+        async function btnVideoDelete(id) {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/stopVideo/${id}`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                });
+                if(response.ok) {fetchActiveVideos()};
+            } catch(e) {
+                console.error('Error while deleting video:', e)
+            }
+        };
 
         // Обработчики для других кнопок
         runVideoBtn.addEventListener('click', runVideo);
