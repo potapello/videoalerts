@@ -1,6 +1,6 @@
 {
   "name": "videoalerts-potapello",
-  "version": "0.3.0",
+  "version": "0.4.1",
   "description": "Videoalerts for Twitch streams",
   "main": "main.js",
   "scripts": {
@@ -15,6 +15,7 @@
     "ws": "^8.19.0"
   },
   "devDependencies": {
+    "cfg-lib": "^0.1.1-5",
     "nodemon": "^3.0.1"
   },
   "engines": {

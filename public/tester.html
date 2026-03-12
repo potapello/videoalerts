@@ -511,7 +511,7 @@
 
         // Запуск видео
         async function runVideo() {
-            const url = videoUrl.value.trim();
+            var url = String(videoUrl.value.trim());
             if (!url) {
                 showMessage('Введите ссылку на видео', 'error');
                 return;
@@ -519,11 +519,14 @@
 
             var data = {
                 videoUrl: url,
-                type: undefined,
+                type: 'ma',
                 lifetime: parseInt(lifetime.value * 1000),
                 affected: false,
                 effect: 'none'
             };
+
+            if(url.includes('youtu')) {data.type = 'yt'};
+            if(url.includes('tiktok')) {showMessage(`Нельзя отправить тиктоки через "Запуск видео", используйте псевдосообщения!`, `error`); return};
 
             // get effect
             var effect = String(affected.value);
@@ -567,7 +570,7 @@
                     headers: {
                         'Content-Type': 'application/json',
                     },
-                    body: JSON.stringify({message: msg})
+                    body: JSON.stringify({message: msg, username: 'tester'})
                 });
 
                 if (!response.ok) {
