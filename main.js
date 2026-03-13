@@ -197,8 +197,8 @@ app.use(cors({
 // TWITCH LOGIC
 
 const WebSocket = require('ws');
-const { json } = require('stream/consumers');
-const { assert } = require('console');
+// const { json } = require('stream/consumers');
+// const { assert } = require('console');
 
 const channel = String(_options.get('channel'));
 let ws = null;
@@ -275,9 +275,11 @@ if(_options.get('modifCustomSpeed')) {_enabledModifiers.push('speed')};
 if(_options.get('modifEasySpeed')) {_enabledModifiers.push('slower', 'faster')};
 if(_options.get('modifAutoRotate')) {_enabledModifiers.push('rotate')};
 if(_options.get('modifPosition')) {_enabledModifiers.push('pos')};
+if(_options.get('modifHueRotate')) {_enabledModifiers.push('party')};
+if(_options.get('modifGrayscale')) {_enabledModifiers.push('cursed')};
 
 var ENABLE_USER_MODIFIERS = Boolean(_options.get('allowModifiers'));
-if(_enabledModifiers.length == 0) {ENABLE_USER_MODIFIERS = false}; // disable in no enabled modifiers
+// if(_enabledModifiers.length == 0) {ENABLE_USER_MODIFIERS = false}; // disable in no enabled modifiers
 
 function twitchMessage(username, message) {
     // prevent from unknown messages 
@@ -344,9 +346,9 @@ function twitchMessage(username, message) {
 // URL EXAMPLES FOR DEV
 // https://cdns.memealerts.com/p/64b955b005b8e6cffec661f2/bb97961c-cdfe-43bf-9564-4e0dcdb6fbd5/alert_orig.webm      MA rect
 // https://cdns.memealerts.com/p/64e10bfe0ea4a111272a89b4/d39c2d23-705d-4b2e-b79c-93004f592eb7/alert_orig.webm      MA album
-// https://www.tiktok.com/@lina7890586/video/7600504908038622497     TT   book
+// https://www.tiktok.com/@dreamytok3/video/7593014025949121814     TT   book
 // https://www.tiktok.com/@kerry_cats/photo/7461971033378131218?_r=1&_t=ZP-94Y2cmhJoul      TTI
-// https://youtu.be/oyvMKX_jozg?list=RDoyvMKX_jozg      YT
+// https://youtu.be/oyvMKX_jozg      YT
 
 async function tiktokWorker(url, mods, effect) {
     // check tikwm api cache 
@@ -428,7 +430,6 @@ app.post('/api/runVideo', async (req, res) => {
         const left = Math.floor(SCREEN_WIDTH * 0.02 + Math.random() * ((SCREEN_WIDTH - VIDEO_MAX_SIZE) * 0.96));
         
         const rotation = VIDEO_APPLY_ROTATION ? (Math.random() * VIDEO_ROTATION_DIAP) - VIDEO_ROTATION_DIAP/2 : 0;
-        const volume = 1;
         
         const videoData = {
             id: videoId,
@@ -439,7 +440,6 @@ app.post('/api/runVideo', async (req, res) => {
             top,
             left,
             rotation,
-            volume,
             startTime: Date.now(),
             duration: typeof lifetime == 'number' ? lifetime : Math.floor((VIDEO_MAX_DURATION/2) + (VIDEO_MAX_DURATION/2) * Math.random()),
             affected: affected ? affected : false,
@@ -482,6 +482,8 @@ if(_options.get('efctSpamming')) {_videoeffects.push('row')};
 if(_options.get('efctLongLife')) {_videoeffects.push('longlife')};
 if(_options.get('efctChangeSpeed')) {_videoeffects.push('slower', 'faster')};
 if(_options.get('efctAutoRotate')) {_videoeffects.push('rotate')};
+if(_options.get('efctHueRotate')) {_videoeffects.push('party')};
+if(_options.get('efctGrayscale')) {_videoeffects.push('cursed')};
 if(_videoeffects.length == 0) {ENABLE_RANDOM_EFFECTS = false}; // disable if no enabled effects
 
 function videoGetEffect(vd) {
@@ -543,7 +545,16 @@ io.on('connection', (socket) => {
         videos: activeVideos.filter(v => {
             return Date.now() - v.startTime < v.duration;
         }),
-        screen: {width: SCREEN_WIDTH, height: SCREEN_HEIGHT}
+        // screen sizes
+        screen: {width: SCREEN_WIDTH, height: SCREEN_HEIGHT},
+        // videoalert spam goal config
+        vasg: {
+            enabled: Boolean(_options.get('vasgEnabled')),
+            total: Number(_options.get('vasgTotalCount')),
+            time: Number(_options.get('vasgSpammingTime')),
+            label: String(_options.get('vasgLabelText')),
+            saves: Boolean(_options.get('vasgEnableSaves'))
+        }
     });
     
     socket.on('disconnect', () => {

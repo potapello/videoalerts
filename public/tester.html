@@ -377,6 +377,8 @@
                         <option value="slower">Замедление</option>
                         <option value="faster">Ускорение</option>
                         <option value="rotate">Вращение</option>
+                        <option value="party">Вечеринка</option>
+                        <option value="cursed">Проклятие</option>
                     </select>
                 </div>
             </div>
@@ -735,6 +737,8 @@
                             ${video.effect == 'slower' ? '<span class="detail-tag">⬅ Замедление</span>' : ''}
                             ${video.effect == 'faster' ? '<span class="detail-tag">➡ Ускорение</span>' : ''}
                             ${video.effect == 'rotate' ? '<span class="detail-tag">🔃 Вращение</span>' : ''}
+                            ${video.effect == 'party' ? '<span class="detail-tag">✨ Вечеринка</span>' : ''}
+                            ${video.effect == 'cursed' ? '<span class="detail-tag">☠ Проклятие</span>' : ''}
 
                             ${video.modifier ? `<span class="detail-tag">⚙ Мод "${video.modifier}"</span>` : ''}
                             <button class="detail-tag delete-video" onclick="btnVideoDelete('${video.id}')">Удалить</button>
@@ -844,8 +848,8 @@
             }
         });
 
-        // Автоматическое обновление списка каждые 5 секунд
-        let autoRefreshInterval = setInterval(fetchActiveVideos, 2000);
+        // Автоматическое обновление списка
+        let autoRefreshInterval = setInterval(fetchActiveVideos, 1000);
 
         // Первоначальная загрузка списка
         fetchActiveVideos();

@@ -154,10 +154,23 @@
             }
         }
 
-        .fullscreen_modifier {
-            position: absolute;
-            left: 50%;
-            transform: translateX(-50%);
+        @keyframes hue-rotate-animation {
+            0% {
+                transform: scale(1) rotate(-5deg);
+                filter: hue-rotate(0deg) saturate(3);
+            } 
+            50% {
+                transform: scale(0.8) rotate(5deg);
+                filter: hue-rotate(180deg) saturate(3);
+            }
+            100% {
+                transform: scale(1) rotate(-5deg);
+                filter: hue-rotate(360deg) saturate(3);
+            }
+        }
+    
+        .effect_hue_rotate {
+            animation: hue-rotate-animation 333ms linear infinite;
         }
     </style>
 </head>
@@ -210,7 +223,7 @@
         function createVideoElement(videoData, skipPB=false) {
             var container = document.createElement('div');
             container.className = 'video-container';
-            container.id = `video_${videoData.id}`;
+            container.id = videoData.id;
             container.dataset.videoId = videoData.id;
             container.dataset.url = videoData.url;
             
@@ -222,7 +235,7 @@
             container.style.transform = `rotate(${videoData.rotation}deg)`;
             
             // Создаем видео элемент
-            const video = document.createElement('video');
+            var video = document.createElement('video');
             video.autoplay = true;
             // video.muted = false; // Включаем звук
 
@@ -247,16 +260,16 @@
             } else if(videoData.type == 'tti') {
                 const data = JSON.parse(videoData.url);
 
-                const music = document.createElement('audio');
+                var music = document.createElement('audio');
                 music.autoplay = true;
                 music.controls = false;
                 music.loop = true;
-                music.volume = videoData.volume;
+                music.volume = 1;
                 music.src = String(data.play);
                 container.appendChild(music);
 
                 if(data.images) {
-                    const image = new Image();
+                    var image = new Image();
                     image.src = data.images[0];
                     image.style.maxHeight = `${videoData.size}px`;
                     image.style.maxWidth = `${videoData.size}px`;
@@ -274,7 +287,7 @@
             // остальные  
             } else {
                 video.src = videoData.url;
-                video.volume = videoData.volume;
+                video.volume = 1;
 
                 if(videoData.type == 'tt') {
                     video.loop = true;
@@ -297,7 +310,7 @@
             
             // Добавляем оверлей для отладки
             if (debugMode) {
-                const overlay = document.createElement('div');
+                var overlay = document.createElement('div');
                 overlay.className = 'video-overlay';
                 overlay.textContent = `ID: ${videoData.id.substring(0, 8)}`;
                 overlay.style.display = 'block';
@@ -336,7 +349,7 @@
             const embedUrl = getYouTubeEmbedUrl(videoData.url);
             if (!embedUrl) {console.error('Invalid YouTube URL'); return};
             // Параметры для iframe
-            let params = new URLSearchParams();
+            var params = new URLSearchParams();
             params.append('rel', '0');
             params.append('modestbranding', '1');
             params.append('autoplay', '1');
@@ -359,7 +372,7 @@
 
         // Удаление элемента видео
         function removeVideoElement(videoId) {
-            const element = document.getElementById(`video_${videoId}`);
+            const element = document.getElementById(`${videoId}`);
             if (element) {
                 element.style.opacity = '0';
                 element.style.transform = `${element.style.transform} scale(0.8)`;
@@ -404,6 +417,12 @@
             // setup screen size
             document.body.style.width = `${data.screen.width}`;
             document.body.style.height = `${data.screen.height}`;
+            // setup spam goal
+            pbTotal = data.vasg.total;
+            pbEventTime = data.vasg.time + 2; // +2 for video load delay
+            document.getElementsByClassName('pb-label')[0].innerHTML = data.vasg.label;
+            pbEventEnabled = data.vasg.enabled;
+            pbSavesEnabled = data.vasg.saves;
         });
 
         socket.on('videoAdded', videoAddWorker);
@@ -448,18 +467,20 @@
                     };
                     videoContainer.appendChild(element);
                 } else {
-                    var vd = videoData;
-                    vd.size = videoData.screenY;
-                    vd.left = 0; vd.top = 0; vd.rotation = 0;
-                    videoContainer.appendChild(createVideoElement(vd, true));
-                    setTimeout(() => {removeVideoElement(videoData.id);}, 15000);
+                    var iframe = element.getElementsByTagName('iframe')[0];
+                    if(iframe) {
+                        iframe.width = videoData.screenX;
+                        iframe.height = videoData.screenY;
+                    } else {console.warn('Cannot get IFrame element for setup fullscreen YT embed!')};
+                    videoContainer.appendChild(element);
+                    setTimeout(() => {removeVideoElement(videoData.id)}, Math.max(10, videoData.duration/2));
                 }
             } else if(videoData.effect == 'row') {
                 videoContainer.appendChild(element);
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1000);
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 2000);
-                if(Math.random() < 0.66) {setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 3000)};
-                if(Math.random() < 0.33) {setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 4000)};
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500*Math.random());
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500+500*Math.random());
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1000+500*Math.random());
+                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1500+500*Math.random());
             } else if (videoData.effect == 'longlife') {
                     try {element.removeChild(element.getElementsByTagName('video')[0])} catch(e) {}; // костыль против какоготохуя играющего саунда вне контейнера
                     fetch(`http://localhost:3000/api/stopVideo/${videoData.id}`, {method: 'POST'});
@@ -474,10 +495,14 @@
             } else if(videoData.effect == 'rotate') {
                 element.classList.add('rotate-animation');
                 videoContainer.appendChild(element)
+            } else if(videoData.effect == 'party' || videoData.effect == 'cursed') {
+                if(videoData.effect == 'party') {element.classList.add('effect_hue_rotate')};
+                if(videoData.effect == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.65) contrast(4)';};
+                videoContainer.appendChild(element)
             }
         };
         // modifiers by users
-        function appendModifierOnElement(element, videoData) {
+        function appendModifierOnElement(element = new HTMLDivElement(), videoData) {
             var modifier = videoData.modifier.split(' ');
             // position
             if(modifier[0] == 'pos') {
@@ -498,6 +523,10 @@
                 videoContainer.appendChild(element)
             } else if(modifier[0] == 'rotate') {
                 element.classList.add('rotate-animation');
+                videoContainer.appendChild(element)
+            } else if(modifier[0] == 'party' || modifier[0] == 'cursed') {
+                if(modifier[0] == 'party') {element.classList.add('effect_hue_rotate')};
+                if(modifier[0] == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.65) contrast(4)'}
                 videoContainer.appendChild(element)
             } else {
                 videoContainer.appendChild(element)
@@ -535,12 +564,15 @@
         let pbLastAlerts = [];
         let pbDefaultTime = 7;
         let pbTimeout = null;
+        let pbEventEnabled = true;
+        let pbSavesEnabled = true;
         const pbElement = document.getElementById('pbProgressBar');
         const pbFillElement = document.getElementById('pbBarFill');
         const pbTextElement = document.getElementById('pbBarText');
 
         // Функция обновления отображения
         function pbUpdateDisplay(showtime=pbDefaultTime) {
+            if(!pbEventEnabled) {return};
             const percentage = Math.min((pbCount / pbTotal) * 100, 100);
             pbFillElement.style.width = percentage + '%';
             pbTextElement.textContent = `${pbCount} из ${pbTotal}`;
@@ -562,7 +594,7 @@
 
         // Функция добавления значения к прогрессу
         function pbAddToCount(value) {
-            if(pbEventProgress > 0) {return}; // skip if event running
+            if(pbEventProgress > 0 || !pbEventEnabled) {return}; // skip if event running or event disabled
             pbCount += value;
 
             // Проверка на достижение или превышение лимита
@@ -657,7 +689,7 @@
         histInitialize();
 
         // загрузка PB переменных из памяти
-        pbCount = +localStorage.getItem(HIST_PB_COUNT_KEY);
+        if(pbSavesEnabled) {pbCount = +localStorage.getItem(HIST_PB_COUNT_KEY)};
         pbTotal = +localStorage.getItem(HIST_PB_TOTAL_KEY);
 
         // Функция добавления нового сообщения в историю
