@@ -385,7 +385,7 @@
 
             <button id="runVideoBtn">Запустить видео</button>
             <div style="margin-top: 15px; color: #888; font-size: 12px;">
-                <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, affected, type 
+                <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, affected, type, effect, modifier 
             </div>
         </div>
 
@@ -468,12 +468,14 @@
         </div>
 
         <div class="footer">
-            Сервер: http://localhost:3000
+            Сервер: http://localhost:?
         </div>
     </div>
 
     <script>
-        const SERVER_URL = 'http://localhost:3000';
+        const SERVER_PORT = 3000 // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        const SERVER_URL = `http://localhost:${SERVER_PORT}`;
+        document.getElementsByClassName('footer')[0].innerHTML = `Сервер: http://localhost:${SERVER_PORT}`
 
         // DOM элементы
         const messageContainer = document.getElementById('messageContainer');
@@ -869,7 +871,7 @@
                     showMessage('Сервер доступен, но вернул ошибку', 'error');
                 }
             } catch (error) {
-                showMessage('Не удалось подключиться к серверу. Убедитесь, что сервер запущен на localhost:3000', 'error');
+                showMessage(`Не удалось подключиться к серверу. Убедитесь, что сервер запущен на localhost:${SERVER_PORT}`, 'error');
             }
         }
 
