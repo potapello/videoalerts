@@ -393,10 +393,10 @@ async function tiktokWorker(url='', mods, effect) {
 
             console.info('Fetched TIKWM tiktok download url!');
             if(data.data.images && data.data.play == data.data.music_info.play) { // images tiktok
-                fetchVideo({videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti'});
+                fetchVideo({videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti', effect: effect, modifier: mods});
                 cacheTIKWM.saveData(url, {videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti'})
             } else {
-                fetchVideo({videoUrl: data.data.play, type: 'tt'});
+                fetchVideo({videoUrl: data.data.play, type: 'tt', effect: effect, modifier: mods});
                 cacheTIKWM.saveData(url, {videoUrl: data.data.play, type: 'tt'})
             };
         } catch(e) {
