@@ -3,6 +3,8 @@
 
 *The project is under development! At the moment, it is posted here solely for development purposes and it won't be possible to use it as intended!*
 
+[ВЕРСИЯ НА РУССКОМ ЯЗЫКЕ](https://github.com/potapello/videoalerts/wiki/README-(Русский))
+
 ## HOW TO START
 1. Install **Node.js** (at least 24.12.0 LTS)
 2. Download **ZIP** and extract
