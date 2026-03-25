@@ -6,28 +6,27 @@
 
 ## HOW TO START
 1. Install **Node.js** (at least 24.12.0 LTS)
-2. Download Videoalerts as **ZIP** and extract
+2. Download Videoalerts repository as **ZIP** and extract
 3. Go to extracted Videoalerts folder, open `cmd` (Shift+RMB in folder > "Open Command Prompt") and run `npm install`
 
 After installing node modules, you need config server
 
-1. Open file **"options.cfg"**, here you can configure server
-2. Find **"channel"** and write your (or streamer) Twitch login. You also can configure your **"moderators"** and other settings
+1. Open file **"options.cfg"**, here you can configure server. (After any changes to the **"options.cfg"**, you need to restart the server)
+2. Find **"channel"** and write your (or streamer) Twitch login. You also can configure your **"moderators"** and other settings (All usernames should be written in lowercase!)
 3. Try to launch **"start.bat"**
 
 If server is working, need to setup client in OBS and test
 
-1. Open **OBS**, add **Browser** source to your scene with url = `http://localhost:3000`
+1. Open **OBS**, add **Browser** source to your scene with url = `http://localhost:3000`. Place the **Browser** in the hierarchy above the capture of the game or screen, this way the alerts will be visible.
 2. Set size to 1920x1080 (default size). You can use a different size, but first you need to specify it in the **"options.cfg"**.
-3. Add **Color Key** filter for **Browser**, change color to `#ff0000`
-4. The green background should disappear
-5. Open your Twitch chat and use "!ma" command for videoalert
+3. Add **Color Key** filter for **Browser**, change color to `#ff0000` or `Green`, the green background should disappear
+5. Open your Twitch chat and use "!ma" command for videoalert (Guides for commands below)
 6. Check OBS, your videoalert should appear
 7. I recommend routing the **Browser** source audio to a separate mixer channel and setting it to about **-10dB**
 
 You need to Update **Browser** source with videoalerts after startup videoalert server at each OBS startup!
 
-> **If you have issues with starting server, open an issue on GitHub or contact me directly!**
+> **If you have issues with starting server, open an issue on GitHub or contact me directly! (TG: @potapell0)**
 
 ## HOW TO USE COMMANDS
 
