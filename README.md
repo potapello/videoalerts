@@ -6,8 +6,8 @@
 
 ## HOW TO START
 1. Install **Node.js** (at least 24.12.0 LTS)
-2. Download **ZIP** and extract
-3. Go to extracted folder, open `cmd` (Shift+RMB in folder > "Open Command Prompt") and run `npm install`
+2. Download Videoalerts as **ZIP** and extract
+3. Go to extracted Videoalerts folder, open `cmd` (Shift+RMB in folder > "Open Command Prompt") and run `npm install`
 
 After installing node modules, you need config server
 
