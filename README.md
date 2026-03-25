@@ -17,7 +17,7 @@ After installing node modules, you need config server
 
 If server is working, need to setup client in OBS and test
 
-1. Open **OBS**, add **Browser** source to your scene with url = `http://localost:3000`
+1. Open **OBS**, add **Browser** source to your scene with url = `http://localhost:3000`
 2. Set size to 1920x1080 (default size). You can use a different size, but first you need to specify it in the **"options.cfg"**.
 3. Add **Color Key** filter for **Browser**, change color to `#ff0000`
 4. The green background should disappear
