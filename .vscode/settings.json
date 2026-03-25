@@ -1,0 +1,38 @@
+{
+    "logFileHighlighter.customPatterns": [
+        {
+        "pattern": "!ma",
+        "foreground": "#00fa2a"
+        },{
+        "pattern": "LOG",
+        "foreground": "#e390f3"
+        },
+        
+
+        {
+            "pattern": "\"code.*?msg.*?processed_time.*?$",
+            "patternFlags": "si",
+            "foreground": "#ff3705",
+        },{
+            "pattern": ".ERROR.*?$",
+            "patternFlags": "si",
+            "foreground": "#ff3705",
+        },{
+            "pattern": ".WARN.*?$",
+            "patternFlags": "si",
+            "foreground": "#ff9b05",
+        },{
+            "pattern": ".Moderator.*?$",
+            "patternFlags": "si",
+            "foreground": "#fffb05",
+        },{
+            "pattern": ".ONLY.*?$",
+            "patternFlags": "si",
+            "foreground": "#adf3ff",
+        },{
+            "pattern": ".modifier.*?$",
+            "patternFlags": "si",
+            "foreground": "#3dfd46",
+        },
+    ]
+}

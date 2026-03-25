@@ -4,6 +4,7 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const cfg = require('cfg-lib');
+// const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -118,6 +119,11 @@ process.on('unhandledRejection', (reason, promise) => {
     logFile.write(errorMessage);
 });
 
+function logInFileOnly(message) {
+    const timestamp = new Date().toLocaleString('sv', {timeZone: _logstimezone});
+    logFile.write(`[${timestamp}] [ONLY] ${message}\n`);
+};
+
 //
 // МЕНЕДЖЕР ФАЙЛОВ
 //
@@ -177,7 +183,75 @@ class DataStorage {
     }
 };
 
-var cacheTIKWM = new DataStorage(path.join(__dirname, 'temp/tikwm.json'));
+//
+// ЗАПУСК ПРОЦЕССОВ PYTHON
+//
+
+// Запускаем Python TTS
+// let pythonProcessTTS = spawn('python', ['tts/main.py']);
+
+// let requestIdTTS = 0;
+// let pendingRequestsTTS = new Map();
+
+// // Обработка ответов от Python
+// pythonProcessTTS.stdout.on('data', (data) => {
+//     const lines = data.toString().split('\n');
+//     lines.forEach(line => {
+//         if (line.trim()) {
+//             try {
+//                 const response = JSON.parse(line);
+//                 // Находим соответствующий запрос
+//                 const pending = pendingRequestsTTS.get(response.requestId);
+//                 if (pending) {
+//                     pending.resolve(response);
+//                     pendingRequestsTTS.delete(response.requestId);
+//                 }
+//             } catch (err) {
+//                 console.error('Parse error:', err);
+//             }
+//         }
+//     })
+// });
+// // Обработка ошибок Python
+// pythonProcessTTS.stderr.on('data', (data) => {
+//     console.error(`Python error: ${data}`);
+// });
+// pythonProcessTTS.on('close', (code) => {
+//     console.log(`Python process exited with code ${code}`);
+// });
+
+// async function requestTTSserver(text) {
+//     var requestIdTTS = ++requestIdTTS;
+//     var request = {
+//         requestId: requestIdTTS, 
+//         text: text, 
+//         id: String(Date.now()), 
+//         speech: 'kseniya'
+//     };
+    
+//     // Создаем Promise для ожидания ответа
+//     const responsePromise = new Promise((resolve, reject) => {
+//         pendingRequestsTTS.set(requestIdTTS, { resolve, reject });
+        
+//         // Таймаут на случай зависания
+//         setTimeout(() => {
+//             if (pendingRequestsTTS.has(requestIdTTS)) {
+//                 pendingRequestsTTS.delete(requestIdTTS);
+//                 reject(new Error('Request timeout'));
+//             }
+//         }, 30000);
+//     });
+    
+//     // Отправляем запрос в Python
+//     pythonProcessTTS.stdin.write(JSON.stringify(request) + '\n');
+    
+//     try {
+//         const result = await responsePromise;
+//         console.error('successful TTS request!', result)
+//     } catch (error) {
+//         console.error('error with request TTS!', error)
+//     }
+// };
 
 //
 // НАСТРОЙКА СЕРВЕРА
@@ -265,11 +339,48 @@ function connect() {
 // Запускаем подключение
 connect();
 
+// ОБРАБОТКА ТАЙМАУТОВ ПОЛЬЗОВАТЕЛЕЙ
+var ENABLE_USER_TIMEOUTS = Boolean(_options.get('requestVideoTimeoutUse'));
+var USER_TIMEOUT_DURATION = Number(_options.get('requestVideoTimeout'));
+var USER_TIMEOUT_MODERATION = Boolean(_options.get('requestVideoTimeoutModeratorsIgnore'));
+var _userTimeouts = {};
+
+function updateUserTimeout(username, ismod) {
+    // if timeout disabled - skip check
+    if(!ENABLE_USER_TIMEOUTS) {return true};
+    const _now = Date.now();
+    // allow if moder and moderignore enabled
+    if(ismod && USER_TIMEOUT_MODERATION) {return true} else {
+        // check if havent timeout data
+        if(_userTimeouts[username] === undefined) {
+            _userTimeouts[username] = _now;
+            return true
+        } else {
+            // check for timeout
+            if(_now - _userTimeouts[username] > USER_TIMEOUT_DURATION) {
+                _userTimeouts[username] = _now
+                return true
+            } else {
+                console.info(`${username}'s request skipped by timeout: ${Math.round((USER_TIMEOUT_DURATION - (_now - _userTimeouts[username]))/100)/10} s.`)
+                return false
+            }
+        }
+    }
+};
+
+// получаем списки модераторов, банов
 var _bannedUsers = String(_options.get('banlist')).split(',');
 var _moderatorUsers = _options.get('moderators').split(',');
-_moderatorUsers.push(channel, 'tester');
-// allow play any direct link to raw video
-var _playRVFUS = Boolean(_options.get('allowUnknownSourceVideos'));
+_moderatorUsers.push(channel, 'tester'); // auto-add streamer and TESTER-APP
+
+// прочие настройки
+var ALLOW_UNKNOWN_SOURCE = Boolean(_options.get('allowUnknownSourceVideos'));
+var DISABLE_TIKTOK_ADS = Boolean(_options.get('tiktokDenyAdVideos'));
+
+var SOURCE_ALLOW_MEMEALERTS     = Boolean(_options.get('sourceAllowMemealerts'));
+var SOURCE_ALLOW_YOUTUBE        = Boolean(_options.get('sourceAllowYoutubeVideos'));
+var SOURCE_ALLOW_SHORTS         = Boolean(_options.get('sourceAllowYoutubeShorts'));
+var SOURCE_ALLOW_TIKTOK         = Boolean(_options.get('sourceAllowTiktok'));
 
 var _enabledModifiers = ['effect'];
 if(_options.get('modifCustomSpeed')) {_enabledModifiers.push('speed')};
@@ -278,6 +389,9 @@ if(_options.get('modifAutoRotate')) {_enabledModifiers.push('rotate')};
 if(_options.get('modifPosition')) {_enabledModifiers.push('pos')};
 if(_options.get('modifHueRotate')) {_enabledModifiers.push('party')};
 if(_options.get('modifGrayscale')) {_enabledModifiers.push('cursed')};
+if(_options.get('modifStretchWide')) {_enabledModifiers.push('wide')};
+if(_options.get('modifStretchTall')) {_enabledModifiers.push('tall')};
+if(_options.get('modifInvertColors')) {_enabledModifiers.push('invert')};
 
 var ENABLE_USER_MODIFIERS = Boolean(_options.get('allowModifiers'));
 
@@ -285,23 +399,31 @@ function twitchMessage(username, message) {
     // prevent from unknown messages 
     if(!message) {console.warn('Message is undefined!'); return};
     if(typeof message != 'string') {console.warn('Message type is not String!'); return};
-    if(message.length < 8) {console.warn('Message length is too short (less than 8)!'); return};
     if(_bannedUsers.indexOf(username) != -1) {return};
     var moderator = _moderatorUsers.indexOf(username) != -1;
     // MEMEALERTS
     if(message.includes('!ma ') && GLOBAL_ENABLER) {
         var msgsplit = String(message).split(" ");
         if(msgsplit.length <= 1) {console.warn('Not enough arguments for "!ma" command!'); return};
+        logInFileOnly(`${username}: ${message}`); // всё сообщение напрямую в файл
         var type = 'unknown';
         var modifier = undefined;
         var effect = 'none';
         // get type
         if(msgsplit[1].includes("cdns.memealerts.com")) {
+            if(!SOURCE_ALLOW_MEMEALERTS) {return};
             if(msgsplit[1].length < 50) {console.warn('Memealerts link for "!ma" too short!'); return};
             type = 'ma'
         };
-        if(msgsplit[1].includes("youtu")) {type = 'yt'};
-        if(msgsplit[1].includes('tiktok.com')) {type = 'tt'};
+        if(msgsplit[1].includes("youtu")) {
+            if(msgsplit[1].includes('short')) {if(!SOURCE_ALLOW_SHORTS) {return}}
+            else {if(!SOURCE_ALLOW_YOUTUBE) {return}};
+            type = 'yt'
+        };
+        if(msgsplit[1].includes('tiktok')) {
+            if(!SOURCE_ALLOW_TIKTOK) {return};
+            type = 'tt'
+        };
         //
         // collecting modifier info
         if(msgsplit[2] && ENABLE_USER_MODIFIERS) {
@@ -334,7 +456,10 @@ function twitchMessage(username, message) {
             }
         };
         // send video to server
-        if(type == 'unknown' && _playRVFUS === false) {console.warn('Unknown video source, video will not sended to server!'); return};
+        if(type == 'unknown' && ALLOW_UNKNOWN_SOURCE === false) {console.warn('Unknown video source, video will not sended to server!'); return};
+        // check timeout
+        if(!updateUserTimeout(username, moderator)) {return};
+        // send video to server
         if(type != 'tt') {
             fetchVideo({videoUrl: msgsplit[1], type: type, modifier: modifier, effect: effect})
         } else {
@@ -343,16 +468,17 @@ function twitchMessage(username, message) {
         // debug
         console.log(`User '${username}' invoke alert -> ${msgsplit[1]} ${modifier ? `|| modifier: ${modifier}` : ''}`)
     //
-    // MODERATOR COMMANDS
+    // MODERATOR SERVER CONTROL COMMANDS
     } else if(message.includes('!mod ')) {
         if(!moderator) {return false};
         var msgsplit = String(message).split(" ");
         if(msgsplit.length <= 1) {console.warn('Not enough arguments for "!mod" command!'); return};
+        logInFileOnly(`${username}: ${message}`); // всё сообщение напрямую в файл
         // detecting commands
         const _validModCommands = ['rema', 'pb', 'serv'];
         if(msgsplit[1]) {
             if(_validModCommands.indexOf(msgsplit[1]) == -1) {
-                console.warn('Unknown moderator command: ' + msgsplit[1])
+                console.warn('Unknown moderator server command: ' + msgsplit[1])
             } else {
                 if(msgsplit[1] == 'rema') {
                     try {fetch(`http://localhost:${PORT}/api/stopAll`, {method: 'POST'})} 
@@ -366,11 +492,38 @@ function twitchMessage(username, message) {
                 } else if(msgsplit[1] == 'serv') {
                     GLOBAL_ENABLER = GLOBAL_ENABLER ? false : true;
                     var _mesg = `Moderator ${username} turn ${GLOBAL_ENABLER ? 'ON' : 'OFF'} all user commands!`;
-                    console.info(_mesg); clientShowNotice(_mesg, GLOBAL_ENABLER ? '#0f0' : '#f00');
+                    GLOBAL_ENABLER ? console.info(_mesg) : console.warn(_mesg);
+                    clientShowNotice(_mesg, GLOBAL_ENABLER ? '#5f5' : '#f55');
                 }
             }
         }
+    //
+    // MODERATOR MESSAGE BOX COMMANDS
+    } else if(message.includes('!msg ')) {
+        if(!moderator) {return false};
+        var msgsplit = String(message).split(" ");
+        if(msgsplit.length <= 1) {console.warn('Not enough arguments for "!msg" command!'); return};
+        logInFileOnly(`${username}: ${message}`); // всё сообщение напрямую в файл
+        // detecting commands
+        const _validMsgCommands = ['fast', 'set', 'hide'];
+        if(msgsplit[1]) {
+            if(_validMsgCommands.indexOf(msgsplit[1]) == -1) {
+                console.warn('Unknown moderator msg command: ' + msgsplit[1])
+            } else {
+                if(msgsplit[1] == 'fast') {if(msgsplit[2]) io.emit('msgBox', {type: 'fast', message: message.substring(10)})} // "!msg fast "
+                else if(msgsplit[1] == 'set') {if(msgsplit[2]) io.emit('msgBox', {type: 'set', message: message.substring(9)})}
+                else if(msgsplit[1] == 'hide') {io.emit('msgBox', {type: 'hide', message: null})};
+            }
+        }
     }
+    //
+    // MODERATOR TTS API COMMANDS
+    // else if(message.includes('!tts ')) {
+    //     if(!moderator) {return false};
+    //     if(message.length < 10) {console.warn('Text for TTS API too short! (canceled)'); return};
+    //     logInFileOnly(`${username}: ${message}`); // всё сообщение напрямую в файл
+    //     fetchTTS(username, message.substring(5)) // "!tts "
+    // }
 };
 // URL EXAMPLES FOR DEV
 // https://cdns.memealerts.com/p/64b955b005b8e6cffec661f2/bb97961c-cdfe-43bf-9564-4e0dcdb6fbd5/alert_orig.webm      MA rect
@@ -380,31 +533,23 @@ function twitchMessage(username, message) {
 // https://youtu.be/oyvMKX_jozg      YT
 
 async function tiktokWorker(url='', mods, effect) {
-    // check tikwm api cache 
-    var cache = cacheTIKWM.findData(url);
-    if(!cache) {
-        try {
-            var response = await fetch(`https://www.tikwm.com/api/`, {method: 'POST', headers: {'Content-Type': 'application/json',}, body: JSON.stringify({url: url})});
-            if(!response.ok) {console.error('No connection with TIKWM API!'); return};
+    try {
+        var response = await fetch(`https://www.tikwm.com/api/`, {method: 'POST', headers: {'Content-Type': 'application/json',}, body: JSON.stringify({url: url})});
+        if(!response.ok) {console.error('No connection with TIKWM API!'); return};
 
-            var data = await response.json();
-            if(data.code !== 0) {console.error('Error with TIKWM API! (code != 0)', data); return};
-            if(data.data.is_ad) {console.warn('Fetched TIKWM tiktok is AD, skipped!'); return};
+        var data = await response.json();
+        if(data.code !== 0) {console.error('Error with TIKWM API! (code != 0)', data); clientShowNotice('Не удалось загрузить Tiktok (неправ. ссылка) :(', '#f95'); return};
+        if(data.data.is_ad && DISABLE_TIKTOK_ADS) {console.warn('Fetched TIKWM tiktok is AD, skipped!'); clientShowNotice('Рекламный Tiktok был пропущен.', '#f95'); return};
 
-            console.info('Fetched TIKWM tiktok download url!');
-            if(data.data.images && data.data.play == data.data.music_info.play) { // images tiktok
-                fetchVideo({videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti', effect: effect, modifier: mods});
-                cacheTIKWM.saveData(url, {videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti'})
-            } else {
-                fetchVideo({videoUrl: data.data.play, type: 'tt', effect: effect, modifier: mods});
-                cacheTIKWM.saveData(url, {videoUrl: data.data.play, type: 'tt'})
-            };
-        } catch(e) {
-            console.error('Error with fetch TIKWM: ', e)
-        }
-    } else {
-        console.info(`Tiktok "${url.substring(0, 50)}" catched from cache!`);
-        fetchVideo({videoUrl: cache.videoUrl, type: cache.type, effect: effect, modifier: mods})
+        console.info('Fetched TIKWM tiktok download url!');
+        if(data.data.images && data.data.play == data.data.music_info.play) { // images tiktok
+            fetchVideo({videoUrl: JSON.stringify({play: data.data.play, images: data.data.images}), type: 'tti', effect: effect, modifier: mods});
+        } else {
+            fetchVideo({videoUrl: data.data.play, type: 'tt', effect: effect, modifier: mods});
+        };
+    } catch(e) {
+        console.error('Error with fetch TIKWM: ', e);
+        clientShowNotice('Не удалось загрузить Tiktok (неизв. причина) :(', '#f95');
     }
 };  
 
@@ -415,6 +560,43 @@ function fetchVideo(body) {
         body: JSON.stringify(body)
     });
 };
+
+// async function fetchTTS(user, text) {
+//     console.info(`TTS by ${user}: ${text}`);
+//     // requestTTSserver(text);
+//     var response = await fetch('https://streamlined-edge-tts.p.rapidapi.com/tts', {
+//         method: 'POST',
+//         headers: {
+//             "Content-Type": "application/json",
+//             'x-rapidapi-key': '',
+// 		    'x-rapidapi-host': 'streamlined-edge-tts.p.rapidapi.com',
+//         },
+//         body: JSON.stringify({
+//             text: text,
+//             voice: "ru-RU-SvetlanaNeural"
+//         })
+//     });
+
+//     // читаем ответ
+//     if(!response.ok) {console.error('Error with fetch tss api:', response.statusText)};
+//     var arrbuffer = await response.arrayBuffer();
+//     const audioBase64 = Buffer.from(arrbuffer).toString('base64');
+
+//     // читаем заголовки (чекаем использование квоты)
+//     var quota = {
+//         limit: response.headers.get("x-ratelimit-requests-limit"),
+//         remaining: response.headers.get("x-ratelimit-requests-remaining"),
+//         reset: response.headers.get("x-ratelimit-requests-reset")
+//     };
+
+//     // Отправляем клиентам через socket.io
+//     io.emit("tts", { 
+//         audio: audioBase64,
+//         text: text,
+//         quota: quota,
+//         user: user
+//     });
+// };
 
 // Конфигурация
 const PORT = Number(_options.get('port'));
@@ -427,6 +609,9 @@ const VIDEO_ROTATION_DIAP = Number(_options.get('videoRotationDiap'));
 
 var ENABLE_RANDOM_EFFECTS = Boolean(_options.get('allowRandomEffects'));
 var RANDOM_EFFECT_CHANCE =  Number(_options.get('randomEffectChance'));
+
+var RANDOMIZE_VIDEO_DURATION = Boolean(_options.get('randomVideoMaxDuration'));
+var RANDOMIZE_VIDEO_SIZE = Boolean(_options.get('randomVideoMaxSize'));
 
 // Хранилище активных видео
 let activeVideos = [];
@@ -453,12 +638,15 @@ app.post('/api/runVideo', async (req, res) => {
         console.log("Received /api/runVideo: " + String(videoUrl).slice(0, 200));
         const videoId = `video_${Date.now()}`;
         
-        let size = Math.floor(VIDEO_MAX_SIZE * 0.8 + Math.random() * (VIDEO_MAX_SIZE * 0.2));
+        const size = RANDOMIZE_VIDEO_SIZE ? Math.floor(VIDEO_MAX_SIZE * 0.8 + Math.random() * (VIDEO_MAX_SIZE * 0.2)) : VIDEO_MAX_SIZE;
         
         const top = Math.floor(SCREEN_HEIGHT * 0.02 + Math.random() * ((SCREEN_HEIGHT - VIDEO_MAX_SIZE) * 0.96));
         const left = Math.floor(SCREEN_WIDTH * 0.02 + Math.random() * ((SCREEN_WIDTH - VIDEO_MAX_SIZE) * 0.96));
         
         const rotation = VIDEO_APPLY_ROTATION ? (Math.random() * VIDEO_ROTATION_DIAP) - VIDEO_ROTATION_DIAP/2 : 0;
+
+        const duration = typeof lifetime == 'number' ? lifetime :
+        RANDOMIZE_VIDEO_DURATION ? Math.floor((VIDEO_MAX_DURATION/2) + (VIDEO_MAX_DURATION/2) * Math.random()) : VIDEO_MAX_DURATION
         
         const videoData = {
             id: videoId,
@@ -470,7 +658,7 @@ app.post('/api/runVideo', async (req, res) => {
             left,
             rotation,
             startTime: Date.now(),
-            duration: typeof lifetime == 'number' ? lifetime : Math.floor((VIDEO_MAX_DURATION/2) + (VIDEO_MAX_DURATION/2) * Math.random()),
+            duration: duration,
             affected: affected ? affected : false,
             effect: effect ? effect : 'none',
             type: type ? type : null,
@@ -478,7 +666,7 @@ app.post('/api/runVideo', async (req, res) => {
         };
 
         // collecting another info
-        if (videoData.type == null) {videoData.type = videoGetType(videoData.url)};
+        if(!videoData.type) {videoData.type = videoGetType(videoData.url)};
         if(videoData.modifier) {videoData.affected = true}; // чтобы эффекты игнорить
         if(!videoData.affected && videoData.effect == 'none') {videoData.effect = videoGetEffect(videoData)};
         // notice about effect
@@ -620,7 +808,7 @@ setInterval(() => {
 // API для управления мем пушками на всех подключенных клиентах
 app.post('/api/pbShow', (req, res) => {
     io.emit('pbShow');
-    res.json({success: true, message: 'showing PB on all clients'});
+    res.json({success: true, message: 'Showing PB on all connected clients.'});
 });
 
 app.post('/api/pbSetValues', (req, res) => {
@@ -631,12 +819,17 @@ app.post('/api/pbSetValues', (req, res) => {
 
         io.emit('pbSetValues', {count, total});
 
-        res.json({success: true, message: 'showing PB on all clients'});
+        res.json({success: true, message: `PB Progress on all connected clients set to: ${count}\\${total}.`});
 
     } catch (error) {
         console.error('Error running video:', error);
         res.status(500).json({ error: error.message });
     }
+});
+
+app.post('/api/pbClearHistory', (req, res) => {
+    io.emit('pbClearHistory');
+    res.json({success: true, message: 'Removing PB History on all connected clients.'});
 });
 
 // псевдосообщения (типо с твича)
@@ -651,10 +844,10 @@ app.post('/api/pseudoMessage', async (req, res) => {
 
         twitchMessage(user, String(message));
 
-        res.json({success: true, message: 'pseudo twitch message sended'})
+        res.json({success: true, message: 'Pseudo-message sended.'})
 
     } catch(error) {
-        console.error('Error send pseudo message:', error);
+        console.error('Error send Pseudo-message:', error);
         res.status(500).json({error: error.message});
     }
 });

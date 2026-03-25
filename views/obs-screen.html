@@ -84,7 +84,7 @@
             right: 20px;
             width: 20%;
             min-width: 200px;
-            background: rgba(0, 0, 0, 0.699);
+            background: rgba(0, 0, 0, 0.8);
             border-radius: 12px;
             padding: 12px 16px;
             box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
@@ -190,7 +190,7 @@
             pointer-events: none;
         }
         .notice {
-            background-color: rgba(0, 0, 0, 0.75);
+            background-color: rgba(0, 0, 0, 0.8);
             color: white;
             padding: 12px 20px;
             border-radius: 8px;
@@ -209,6 +209,30 @@
         }
         .notice.visible {
             opacity: 1;
+        }
+
+        /* меседж бохс */
+        .message-box {
+            position: fixed;
+            top: 20px;
+            left: 20px;
+            z-index: 9999;
+            color: white;
+            font-weight: 700;
+            font-size: 20px;
+            background-color: rgba(0, 0, 0, 0.8); 
+            padding: 12px 20px;
+            border-radius: 8px;
+            max-width: 500px;
+            word-wrap: break-word;
+            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
+            opacity: 0;
+            visibility: hidden;
+            transition: opacity 0.2s ease, visibility 0.2s ease;
+        }
+        .message-box.visible {
+            opacity: 1;
+            visibility: visible;
         }
     </style>
 </head>
@@ -235,6 +259,9 @@
     <div class="notice-container">
         <div id="notice" class="notice"></div>
     </div>
+
+    <!-- меседж бокс -->
+     <div id="messageBox" class="message-box"></div>
     
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -552,9 +579,8 @@
             // position
             if(modifier[0] == 'pos') {
                 element.style.transform = ``;
-                element.style.left = `${modifier[1] < 0 ? 0 : modifier[1] > videoData.screenX ? videoData.screenX : modifier[1]}px`;
-                element.style.top = `${modifier[2] < 0 ? 0 : modifier[2] > videoData.screenY ? videoData.screenY : modifier[2]}px`;
-                videoContainer.appendChild(element);
+                element.style.left = `${modifier[1] < -videoData.size ? -videoData.size : modifier[1] > videoData.screenX ? videoData.screenX : modifier[1]}px`;
+                element.style.top = `${modifier[2] < -videoData.size ? -videoData.size : modifier[2] > videoData.screenY ? videoData.screenY : modifier[2]}px`;
             // effects
             } else if(modifier[0] == 'slower' || modifier[0] == 'faster' || modifier[0] == 'speed') {
                 var media = element.getElementsByTagName('video')[0];
@@ -564,18 +590,28 @@
                     if(modifier[0] == 'faster') {media.playbackRate = 1.5}
                     else if(modifier[0] == 'slower') {media.playbackRate = 0.7}
                     else if(modifier[0] == 'speed') {media.playbackRate = modifier[1]};
-                };
-                videoContainer.appendChild(element)
+                }
             } else if(modifier[0] == 'rotate') {
-                element.classList.add('rotate-animation');
-                videoContainer.appendChild(element)
-            } else if(modifier[0] == 'party' || modifier[0] == 'cursed') {
+                element.classList.add('rotate-animation')
+            } else if(modifier[0] == 'party' || modifier[0] == 'cursed' || modifier[0] == 'invert') {
                 if(modifier[0] == 'party') {element.classList.add('effect_hue_rotate')};
-                if(modifier[0] == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.7) contrast(4)'}
-                videoContainer.appendChild(element)
-            } else {
-                videoContainer.appendChild(element)
-            }
+                if(modifier[0] == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.7) contrast(4)'};
+                if(modifier[0] == 'invert') {element.style.filter = 'invert(1) saturate(2)'}
+            } else if(modifier[0] == 'wide' || modifier[0] == 'tall') {
+                var media = element.getElementsByTagName('image')[0];
+                media = media ? media : element.getElementsByTagName('video')[0];
+                if(media) {
+                    media.onplaying = () => {media.style.objectFit = 'fill'};
+                    if(modifier[0] == 'wide') {
+                        media.width = videoData.size;
+                        media.height = Math.floor(videoData.size*0.4);
+                    } else {
+                        media.width = Math.floor(videoData.size*0.4);
+                        media.height = videoData.size;
+                    }
+                } // invert(1) saturate(2)
+            };
+            videoContainer.appendChild(element)
         };
         
         socket.on('videoRemoved', (videoId) => {
@@ -668,16 +704,16 @@
         function pbRandomAlert() {
             return pbLastAlerts[Math.floor(Math.random() * (pbLastAlerts.length - 0.001))]
         };
-        var _randomalertseffects = ['rotate', 'none', 'slower', 'none', 'faster'];
+        var _randomalertseffects = ['rotate', undefined, 'slower', undefined, 'faster', undefined, 'party', undefined, 'cursed', undefined, 'wide', undefined, 'tall', undefined, 'invert'];
         var _randomalertsgeteff = () => _randomalertseffects[Math.floor(Math.random() * (_randomalertseffects - 0.001))];
 
         function pbDeployRandomAlerts() {
             pbEventProgress -= 1;
             if(pbEventProgress > 1) {
                 var eff = _randomalertsgeteff();
-                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: eff=='none', effect: eff, type: undefined})};
+                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, affected: true, type: undefined})};
                 eff = _randomalertsgeteff();
-                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: eff=='none', effect: eff, type: undefined})};
+                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, affected: true, type: undefined})};
                 // if(Math.random() < 0.4) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: true, effect: 'none', type: undefined})};
                 setTimeout(() => {pbDeployRandomAlerts()}, 1000)
             } else {
@@ -793,6 +829,10 @@
         function histClear() {
             localStorage.setItem(HIST_STORAGE_KEY, JSON.stringify([]));
         };
+        socket.on('pbClearHistory', (values) => {
+            histClear();
+            showNotice('История алертов для ВидеоПушки удалена!', '#ff5555')
+        });
 
         // системные уведомления
         let noticeTimeout;
@@ -815,6 +855,68 @@
         socket.on('showNotice', (values) => {
             showNotice(values.text, values.color)
         });
+
+        // MESSAGE BOX CONTROLS
+        const messageElement = document.getElementById('messageBox');
+        let autoHideTimer = null;
+
+        function truncateText(text) {
+            if (typeof text !== 'string') text = String(text);
+            return text.length > 200 ? text.substring(0, 200) + '…' : text;
+        };
+        function clearAutoHideTimer() {
+            if (autoHideTimer) {
+                clearTimeout(autoHideTimer);
+                autoHideTimer = null;
+            }
+        };
+
+        function messageBoxSet(text) {
+            clearAutoHideTimer();
+            const safeText = truncateText(text);
+            messageElement.textContent = safeText;
+            messageElement.classList.add('visible');
+        };
+        function messageBoxHide() {
+            clearAutoHideTimer();
+            messageElement.classList.remove('visible');
+        };
+        function messageBoxFast(text) {
+            clearAutoHideTimer();
+            const safeText = truncateText(text);
+            messageElement.textContent = safeText;
+            messageElement.classList.add('visible');
+
+            const textLength = safeText.length;
+            let additionalSeconds = Math.floor(textLength / 10);
+            let totalSeconds = 10 + additionalSeconds;
+            if (totalSeconds > 30) totalSeconds = 30;
+            const delayMs = totalSeconds * 1000;
+
+            autoHideTimer = setTimeout(() => {
+                messageElement.classList.remove('visible');
+                autoHideTimer = null;
+            }, delayMs);
+        };
+
+        socket.on('msgBox', (values) => {
+            if(values.type == 'fast') {messageBoxFast(values.message); return};
+            if(values.type == 'set') {messageBoxSet(values.message); return};
+            if(values.type == 'hide') {messageBoxHide()}
+        });
+
+        //
+        // TTS Audio Player
+        //
+        // Получаем base64 от сервера
+        socket.on("tts", (data) => {
+            // Вариант с base64
+            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
+            audio.play();
+            // show notice
+            showNotice(`${data.user} использует TTS API! (Квота: ${data.quota.remaining}\\${data.quota.limit}, обновление через ${Math.floor(data.quota.reset/360)/10} часов.`);
+        });
+
         // 
         // debug assets
         //
@@ -846,6 +948,7 @@
                     lifetime: changes.lifetime !== undefined ? changes.lifetime : vd.lifetime,
                     affected: changes.affected !== undefined ? changes.affected : vd.affected,
                     effect: changes.effect !== undefined ? changes.effect : vd.effect,
+                    modifier: changes.modifier !== undefined ? changes.modifier : vd.modifier,
                 })
             })
         };

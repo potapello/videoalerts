@@ -1,17 +1,18 @@
 # Videoalerts
-**by potapello**
 
 *The project is under development! At the moment, it is posted here solely for development purposes and it won't be possible to use it as intended!*
+
+[ВЕРСИЯ НА РУССКОМ ЯЗЫКЕ](https://github.com/potapello/videoalerts/wiki/README-(Русский))
 
 ## HOW TO START
 1. Install **Node.js** (at least 24.12.0 LTS)
 2. Download **ZIP** and extract
-3. Go to extracted folder and run `npm install`
+3. Go to extracted folder, open `cmd` (Shift+RMB in folder > "Open Command Prompt") and run `npm install`
 
 After installing node modules, you need config server
 
 1. Open file **"options.cfg"**, here you can configure server
-2. Find **"channel"** and write your (or streamer) Twitch login. You also can configure your **"moderators"**
+2. Find **"channel"** and write your (or streamer) Twitch login. You also can configure your **"moderators"** and other settings
 3. Try to launch **"start.bat"**
 
 If server is working, need to setup client in OBS and test
@@ -23,6 +24,8 @@ If server is working, need to setup client in OBS and test
 5. Open your Twitch chat and use "!ma" command for videoalert
 6. Check OBS, your videoalert should appear
 7. I recommend routing the **Browser** source audio to a separate mixer channel and setting it to about **-10dB**
+
+You need to Update **Browser** source with videoalerts after startup videoalert server at each OBS startup!
 
 > **If you have issues with starting server, open an issue on GitHub or contact me directly!**
 
@@ -44,6 +47,8 @@ You can also allow sending direct links to videos from any source (set **allowUn
 - `speed [x]` sets custom playback rate, range -> **[0.25; 3.0]**
 - `party` infinite color changing (hue-rotate) and shaking
 - `cursed` video will be grayscale
+- `wide`, `tall` extends videoalert width/height
+- `invert` invert colors of videoalerts
 
 Moderators can also send an effect as a modifier:
 
@@ -58,3 +63,22 @@ Moderators can also send an effect as a modifier:
 - `rema` removes all videos from server
 - `pb [x] [y]` sets VideoCannon event **count\total** values to **X\Y**
 - `serv` enables/disables `!ma` command for all users
+
+### Command `!msg <mode> [text]` (only for moderators)
+
+Showing message for viewers on screen, on top left corner. 
+It can be used by moderators for such messages: **Streamer has gone to eat :)**, **Watching "Kill la Kill", Episode 3** etc.
+
+`<mode>` required, can be:
+- `fast [text]` message will appear for a while, up to 30 seconds, depending on its length
+- `set [text]` shows/updates the message, it doesn't disappear by itself
+- `hide` hides all types of messages
+
+## TODO
+
+- Server stability, add more comments in code for devs
+- Write better `README`, detailed, clear, and about everything
+- Add support for `stream.gate-dzgas` platform (as alternative build)
+- Maybe, add support for another streaming platforms
+- Add the ability to change some configurations for moderators (for one server session)
+- Decide what to do with the effects (maybe I'll leave only the modifiers)

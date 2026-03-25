@@ -419,7 +419,7 @@
             <h2>📏 Управление прогрессбаром</h2>
         
             <!-- Блок установки значений -->
-            <div style="display: grid; grid-template-columns: auto 1fr 1fr auto; gap: 5px; align-items: flex-end;">
+            <div style="display: grid; grid-template-columns: auto 1fr 1fr auto auto; gap: 5px; align-items: flex-end;">
 
                 <!-- Блок показа прогрессбара -->
                 <div class="form-group" style="margin-bottom: 0;">
@@ -438,6 +438,9 @@
             
                 <div class="form-group" style="margin-bottom: 0;">
                     <button id="pbSetValuesBtn" class="primary">Изменить значения</button>
+                </div>
+                <div class="form-group" style="margin-bottom: 0;">
+                    <button id="pbClearHistoryBtn" class="danger">Удалить историю</button>
                 </div>
             </div>
             <div style="margin-top: 15px; color: #888; font-size: 12px;">
@@ -473,7 +476,12 @@
     </div>
 
     <script>
-        const SERVER_PORT = 3000 // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        // CHANGE THIS, IF YOU USE ANOTHER PORT IN `OPTIONS.CFG`
+        //                  vvvvv
+        const SERVER_PORT = 3000
         const SERVER_URL = `http://localhost:${SERVER_PORT}`;
         document.getElementsByClassName('footer')[0].innerHTML = `Сервер: http://localhost:${SERVER_PORT}`
 
@@ -700,7 +708,23 @@
                 showMessage(`Ошибка: ${error.message}`, 'error');
                 console.error('Error:', error);
             }
-        }
+        };
+
+        async function pbClearHistory() {
+            try {
+                const response = await fetch(`${SERVER_URL}/api/pbClearHistory`, {method: 'POST', headers: {'Content-Type': 'application/json'}});
+            
+                if (!response.ok) {
+                    const errorData = await response.json().catch(() => ({}));
+                    throw new Error(errorData.error || `HTTP error! status: ${response.status}`);
+                }
+            
+                showMessage(`История МемПушки удалена!`, 'success');
+            } catch (error) {
+                showMessage(`Ошибка: ${error.message}`, 'error');
+                console.error('Error:', error);
+            }
+        };
 
         // Отображение активных видео
         function displayVideos(videos) {
@@ -821,6 +845,7 @@
         // события контроля прогрессбаром
         document.getElementById('pbShowBtn').addEventListener('click', showProgressBar);
         document.getElementById('pbSetValuesBtn').addEventListener('click', setProgressBarValues);
+        document.getElementById('pbClearHistoryBtn').addEventListener('click', pbClearHistory);
 
         // Добавляем обработку Enter в полях ввода
         document.getElementById('pbCount').addEventListener('keypress', (e) => {
