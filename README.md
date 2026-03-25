@@ -19,7 +19,7 @@ If server is working, need to setup client in OBS and test
 
 1. Open **OBS**, add **Browser** source to your scene with url = `http://localhost:3000`. Place the **Browser** in the hierarchy above the capture of the game or screen, this way the alerts will be visible.
 2. Set size to 1920x1080 (default size). You can use a different size, but first you need to specify it in the **"options.cfg"**.
-3. Add **Color Key** filter for **Browser**, change color to `#ff0000` or `Green`, the green background should disappear
+3. Add **Color Key** filter for **Browser**, change color to `#00ff00` or `Green`, the green background should disappear
 5. Open your Twitch chat and use "!ma" command for videoalert (Guides for commands below)
 6. Check OBS, your videoalert should appear
 7. I recommend routing the **Browser** source audio to a separate mixer channel and setting it to about **-10dB**
