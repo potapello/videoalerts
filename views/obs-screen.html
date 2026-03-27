@@ -210,30 +210,6 @@
         .notice.visible {
             opacity: 1;
         }
-
-        /* меседж бохс */
-        .message-box {
-            position: fixed;
-            top: 20px;
-            left: 20px;
-            z-index: 9999;
-            color: white;
-            font-weight: 700;
-            font-size: 20px;
-            background-color: rgba(0, 0, 0, 0.8); 
-            padding: 12px 20px;
-            border-radius: 8px;
-            max-width: 500px;
-            word-wrap: break-word;
-            box-shadow: 0 4px 12px rgba(0,0,0,0.2);
-            opacity: 0;
-            visibility: hidden;
-            transition: opacity 0.2s ease, visibility 0.2s ease;
-        }
-        .message-box.visible {
-            opacity: 1;
-            visibility: visible;
-        }
     </style>
 </head>
 <body>
@@ -248,10 +224,10 @@
     <div class="status-indicator" id="statusIndicator"></div>
 
     <div id="pbProgressBar" class="pb-progress-container hidden">
-        <center><div class="pb-label">МЕМНЫЙ НАСЁР</div></center>
+        <center><div class="pb-label">spamcannon</div></center>
         <div class="pb-bar-wrapper">
             <div class="pb-bar-fill" id="pbBarFill"></div>
-            <span class="pb-bar-text" id="pbBarText">0 из 100</span>
+            <span class="pb-bar-text" id="pbBarText">count/total</span>
         </div>
     </div>
 
@@ -259,9 +235,6 @@
     <div class="notice-container">
         <div id="notice" class="notice"></div>
     </div>
-
-    <!-- меседж бокс -->
-     <div id="messageBox" class="message-box"></div>
     
     <script src="/socket.io/socket.io.js"></script>
     <script>
@@ -503,75 +476,14 @@
             const element = createVideoElement(videoData, skipPB);
             if(element) {
                 // setup effects
-                if(videoData.affected || videoData.type == 'tti') { // если эффект уже есть - кидаем сразу
-                    if(videoData.modifier) {
-                        console.log('Video modifier:', videoData.modifier);
-                        appendModifierOnElement(element, videoData)
-                    } else {
-                        videoContainer.appendChild(element)
-                    }
+                if(videoData.modifier) {
+                    console.log('Video modifier:', videoData.modifier);
+                    appendModifierOnElement(element, videoData)
                 } else {
-                    if(videoData.effect != 'none') {
-                        appendEffectOnElement(element, videoData);
-                        console.log("Video effect:", videoData.effect)
-                    } else {
-                        videoContainer.appendChild(element)
-                    }
-
-                };
-                updateVideoCount();
-            }
-        };
-        // random effects
-        function appendEffectOnElement(element = new HTMLDivElement(), videoData) {
-            videoData.affected = true;
-            if(videoData.effect == 'fullscreen') {
-                element.style.transform = ``;
-                element.style.top = `0px`;
-                element.style.left = `0px`;
-                element.style.maxWidth = `${videoData.screenX}px`;
-                element.style.maxHeight = `${videoData.screenY}px`;
-                if(videoData.type != 'yt') {
-                    var media = element.getElementsByTagName('video')[0];
-                    media.oncanplay = () => {
-                        media.height = videoData.screenY; 
-                        setTimeout(() => {element.style.left = `${Math.floor(1920/2 - element.clientWidth/2)}px`}, 1000);
-                    };
-                    videoContainer.appendChild(element);
-                } else {
-                    var iframe = element.getElementsByTagName('iframe')[0];
-                    if(iframe) {
-                        iframe.width = videoData.screenX;
-                        iframe.height = videoData.screenY;
-                    } else {console.warn('Cannot get IFrame element for setup fullscreen YT embed!')};
-                    videoContainer.appendChild(element);
-                    setTimeout(() => {removeVideoElement(videoData.id)}, Math.max(10, videoData.duration/2));
+                    videoContainer.appendChild(element)
                 }
-            } else if(videoData.effect == 'row') {
-                videoContainer.appendChild(element);
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500+500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1000+500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1500+500*Math.random());
-            } else if (videoData.effect == 'longlife') {
-                    try {element.removeChild(element.getElementsByTagName('video')[0])} catch(e) {}; // костыль против какоготохуя играющего саунда вне контейнера
-                    fetch(`/api/stopVideo/${videoData.id}`, {method: 'POST'});
-                    apiRunVideo(videoData, {lifetime: Math.floor(60000 + Math.random() * 60000), affected: true})
-            } else if (videoData.effect == 'slower' || videoData.effect == 'faster') {
-                var media = element.getElementsByTagName('video')[0];
-                if(media) {
-                    media.preservesPitch = false;
-                    media.playbackRate = videoData.effect == 'slower' ? 0.7 : 1.5
-                };
-                videoContainer.appendChild(element)
-            } else if(videoData.effect == 'rotate') {
-                element.classList.add('rotate-animation');
-                videoContainer.appendChild(element)
-            } else if(videoData.effect == 'party' || videoData.effect == 'cursed') {
-                if(videoData.effect == 'party') {element.classList.add('effect_hue_rotate')};
-                if(videoData.effect == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.7) contrast(4)'};
-                videoContainer.appendChild(element)
-            }
+            };
+            updateVideoCount();
         };
         // modifiers by users
         function appendModifierOnElement(element = new HTMLDivElement(), videoData) {
@@ -609,7 +521,7 @@
                         media.width = Math.floor(videoData.size*0.4);
                         media.height = videoData.size;
                     }
-                } // invert(1) saturate(2)
+                }
             };
             videoContainer.appendChild(element)
         };
@@ -856,67 +768,6 @@
             showNotice(values.text, values.color)
         });
 
-        // MESSAGE BOX CONTROLS
-        const messageElement = document.getElementById('messageBox');
-        let autoHideTimer = null;
-
-        function truncateText(text) {
-            if (typeof text !== 'string') text = String(text);
-            return text.length > 200 ? text.substring(0, 200) + '…' : text;
-        };
-        function clearAutoHideTimer() {
-            if (autoHideTimer) {
-                clearTimeout(autoHideTimer);
-                autoHideTimer = null;
-            }
-        };
-
-        function messageBoxSet(text) {
-            clearAutoHideTimer();
-            const safeText = truncateText(text);
-            messageElement.textContent = safeText;
-            messageElement.classList.add('visible');
-        };
-        function messageBoxHide() {
-            clearAutoHideTimer();
-            messageElement.classList.remove('visible');
-        };
-        function messageBoxFast(text) {
-            clearAutoHideTimer();
-            const safeText = truncateText(text);
-            messageElement.textContent = safeText;
-            messageElement.classList.add('visible');
-
-            const textLength = safeText.length;
-            let additionalSeconds = Math.floor(textLength / 10);
-            let totalSeconds = 10 + additionalSeconds;
-            if (totalSeconds > 30) totalSeconds = 30;
-            const delayMs = totalSeconds * 1000;
-
-            autoHideTimer = setTimeout(() => {
-                messageElement.classList.remove('visible');
-                autoHideTimer = null;
-            }, delayMs);
-        };
-
-        socket.on('msgBox', (values) => {
-            if(values.type == 'fast') {messageBoxFast(values.message); return};
-            if(values.type == 'set') {messageBoxSet(values.message); return};
-            if(values.type == 'hide') {messageBoxHide()}
-        });
-
-        //
-        // TTS Audio Player
-        //
-        // Получаем base64 от сервера
-        socket.on("tts", (data) => {
-            // Вариант с base64
-            const audio = new Audio(`data:audio/mp3;base64,${data.audio}`);
-            audio.play();
-            // show notice
-            showNotice(`${data.user} использует TTS API! (Квота: ${data.quota.remaining}\\${data.quota.limit}, обновление через ${Math.floor(data.quota.reset/360)/10} часов.`);
-        });
-
         // 
         // debug assets
         //
@@ -946,8 +797,6 @@
                     videoUrl: changes.url !== undefined ? changes.url : vd.url,
                     type: changes.type !== undefined ? changes.type : vd.type,
                     lifetime: changes.lifetime !== undefined ? changes.lifetime : vd.lifetime,
-                    affected: changes.affected !== undefined ? changes.affected : vd.affected,
-                    effect: changes.effect !== undefined ? changes.effect : vd.effect,
                     modifier: changes.modifier !== undefined ? changes.modifier : vd.modifier,
                 })
             })
