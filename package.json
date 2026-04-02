@@ -1,6 +1,6 @@
 {
-  "name": "videoalerts-potapello",
-  "version": "0.6.0",
+  "name": "stream-videoalerts",
+  "version": "0.7.0",
   "description": "Videoalerts for Twitch streams",
   "main": "main.js",
   "scripts": {

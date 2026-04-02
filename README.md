@@ -1,84 +1,138 @@
 # Videoalerts
 
-*The project is under development! At the moment, it is posted here solely for development purposes and it won't be possible to use it as intended!*
+Многофункциональное, полностью настраиваемое приложение для отображения на стриме различных коротких видео, отправленных зрителями. Работает с Twitch чатом, поддерживаемые видео: Memealerts, Youtube и Tiktok. 
 
-[ВЕРСИЯ НА РУССКОМ ЯЗЫКЕ](https://github.com/potapello/videoalerts/wiki/README-(Русский))
+Приложение состоит из сервера на Node.js и клиента, автоматически размещаемого в localhost. Пользователи отправляют видео через команду в чате, сервер считывает команду и получает видео. Клиент получает список видео с сервера, формирует их внешний вид и отображает их.
 
-## HOW TO START
-1. Install **Node.js** (at least 24.12.0 LTS)
-2. Download Videoalerts repository as **ZIP** and extract
-3. Go to extracted Videoalerts folder, open `cmd` (Shift+RMB in folder > "Open Command Prompt") and run `npm install`
+Также приложение имеет множество других функций: "СпамПушка", окно сообщений модераторов, возможность самостоятельной разметки оверлея, напоминания рандомными эффектами, возможность подключить TTS для модераторов, контроль сервером через команды в чате, контроль сервером через `tester`, настройка таймаутов для пользователей, возможность разрешить видео из любых источников.
 
-After installing node modules, you need config server
+## Как начать
+Перейдите в список релизов [Releases](https://github.com/potapello/videoalerts/releases/tag/indev) и скачайте последний (на данный момент есть билды только для Windows x64). Распакуйте папку `videoalerts` куда угодно и попробуйте запустить `videoalerts.exe`. Если сервер запустился, (будет сообщение в консоли `Server running on...`), то следующие 3 шага можно пропустить. Если сервер не запускается, то можете попробовать способ ниже.
 
-1. Open file **"options.cfg"**, here you can configure server. (After any changes to the **"options.cfg"**, you need to restart the server)
-2. Find **"channel"** and write your (or streamer) Twitch login. You also can configure your **"moderators"** and other settings (All usernames should be written in lowercase!)
-3. Try to launch **"start.bat"**
+1. Установите **Node.js** на свой ПК (не ниже 24.12.0 LTS).
+2. Скачайте репозиторий как **ZIP** и распакуйте куда удобно (не клонируйте репозиторий, если не планируете редактировать код).
+3. Перейдите в распакованную папку `videoalerts`, откройте в ней `cmd` (Shift+ПКМ, "Открыть окно команд") и выполните `npm install`.
 
-If server is working, need to setup client in OBS and test
+После установки сервера необходимо его настроить:
 
-1. Open **OBS**, add **Browser** source to your scene with url = `http://localhost:3000`. Place the **Browser** in the hierarchy above the capture of the game or screen, this way the alerts will be visible.
-2. Set size to 1920x1080 (default size). You can use a different size, but first you need to specify it in the **"options.cfg"**.
-3. Add **Color Key** filter for **Browser**, change color to `#00ff00` or `Green`, the green background (if he was) should disappear
-5. Open your Twitch chat and use "!ma" command for videoalert (Guides for commands below)
-6. Check OBS, your videoalert should appear
-7. I recommend routing the **Browser** source audio to a separate mixer channel and setting it to about **-10dB** (to listen, set "Listening and output" mode for mixer)
-8. In the "public" folder you can find the tester **"tester.html"**, you can run it in your browser. In it, you can test the server and control videoalerts.
+1. Откройте файл **"options.cfg"**, здесь вы можете настроить сервер (после любых изменений в **"options.cfg"** нужно перезапускать сервер).
+2. Найдите **"channel"** и укажите логин своего (или стримера) Twitch. Также вы можете настроить **"moderators"** и другие настройки (все имена нужно писать в нижнем регистре).
+3. Попробуйте запустить сервер.
 
-You need to Update **Browser** source with videoalerts after startup videoalert server at each OBS startup!
+Если сервер работает, нужно настроить клиент в OBS и протестировать:
 
-> **If you have issues with starting server, open an issue on GitHub or contact me directly! (TG: @potapell0)**
+1. Откройте **OBS**, добавьте источник **Browser** на сцену с url = `http://localhost:3000`. Разместите источник в иерархии выше захвата игры или окна.
+2. Установите размер 1920x1080 (размер по умолчанию). Вы можете использовать другой размер, но сначала нужно указать его в **"options.cfg"**.
+3. Добавьте фильтр **Color Key** для **Browser**, измените цвет на `#00ff00`, зелёный фон (если он был) должен исчезнуть.
+5. Откройте чат Twitch и используйте команду "!ma" для видеоалерта.
+6. Проверьте OBS, ваш видеоалерт должен появиться .
+7. Рекомендую направить аудио источника **Browser** на отдельный канал микшера и установить громкость около **-10dB** (чтобы слышать, включите режим у микшера "Только прослушивание", или "Прослушивание и вывод" если вы не выводите звук с рабочего стола).
+8. Также вы можете перейти по адресу `http://localhost:3000/tester` в своём браузере. На этой странице можно тестировать сервер и контролировать видеоалерты.
 
-## HOW TO USE COMMANDS
+Сначала запускаете **Videoalerts** сервер, а после **OBS**. В ином случае, после запуска сервера перейдите в **OBS** и обновите источник **Browser**, чтобы тот подключился к серверу!
 
-### Command `!ma <url> [modifier]` (all users)
+> **Если у вас возникли проблемы, создайте Issue на GitHub или свяжитесь со мной напрямую! (ТГ: @potapell0)**
 
-`<url>` required. This is the link to the video for videoalert. By default, you can send the following links:
-- Memealerts `cdns.memealerts.com` (you can get it on the https://memealerts.com/ website by clicking RMB on the video and copying the direct link)
-- Youtube videos & shorts `youtube.com, youtu.be`
-- Tiktok videos & images `tiktok.com`
+## Как использовать команды
 
-You can also allow sending direct links to videos from any source (set **allowUnknownSourceVideos=true** in **options.cfg**). Not recommended!!!
+### Команда `!ma <url> [модификатор]` (все пользователи)
 
-`[?modifier]` optional. Users can apply modifiers on videoalerts. List of modifiers:
-- `pos [x] [y]` sets position for videoalert
-- `rotate` video will rotate
-- `faster`, `slower` sets playback rate **(x1.5 and x0.7)**
-- `speed [x]` sets custom playback rate, range -> **[0.25; 3.0]**
-- `party` infinite color changing (hue-rotate) and shaking
-- `cursed` video will be grayscale
-- `wide`, `tall` extends videoalert width/height
-- `invert` invert colors of videoalerts
+`<url>` обязательный параметр. Это ссылка на видео для видеоалерта. По умолчанию можно отправлять следующие ссылки:
+- Memealerts `cdns.memealerts.com` (можно получить на сайте https://memealerts.com/, нажав ПКМ на открытом видео и скопировав прямую ссылку)
+- Youtube видео и shorts `youtube.com, youtu.be`
+- Tiktok видео и наборы изображений `tiktok.com`
 
-Moderators can also send an effect as a modifier:
+Вы также можете разрешить отправку прямых ссылок на видео из любых источников (установите **allowUnknownSourceVideos=true** в **options.cfg**). Не рекомендуется для Twitch, пользователи могут легко отправить запретку!
 
-- `effect longlife` the video will "live" on the server longer (random time from 60 to 120 seconds)
-- `effect fullscreen` fullscreen videoalert for short time **(~12 seconds)**
-- `effect row` there will be 5 copies of videoalert running in a row instead of one
+`[модификатор]` необязательный параметр. Пользователи могут применять модификаторы к видеоалертам. По умолчанию включены, выключить можно в конфиге `allowModifiers`. Список модификаторов:
+- `pos [x] [y]` устанавливает позицию видеоалерта.
+- `rotate` видео будет вращаться.
+- `faster`, `slower` устанавливает скорость воспроизведения **(x1.5 и x0.7)**.
+- `speed [x]` устанавливает пользовательскую скорость воспроизведения, диапазон -> **[0.25; 3.0]**.
+- `party` бесконечное изменение цвета (hue-rotate) и тряска.
+- `cursed` видеоалерт будет чёрно-белым.
+- `wide`, `tall` делают видеоалерт широким/высоким.
+- `invert` инвертируют цвета видеоалерта.
 
-### Command `!mod <action> [args]` (only for moderators)
+Если пользователь не выбирает модификатор сам, сервер с некоторым шансом может выбрать случайный. Шанс настраивается переменной `randomModifierChance` в конфиге, можете выставить `0` чтобы выключить это. 
 
-`<action>` required. The action to be performed:
+Важно: модификаторы скорости не действуют на Youtube. На Tiktok-картинки не действуют ВСЕ модификаторы и эффекты!
 
-- `rema` removes all videos from server
-- `pb [x] [y]` sets VideoCannon event **count\total** values to **X\Y**
-- `serv` enables/disables `!ma` command for all users
+### Команда `!mod <действие> [аргументы]` (только для модераторов)
 
-### Command `!msg <mode> [text]` (only for moderators)
+`<действие>` обязательный параметр. Действие, которое нужно выполнить:
 
-Showing message for viewers on screen, on top left corner. 
-It can be used by moderators for such messages: **Streamer has gone to eat :)**, **Watching "Kill la Kill", Episode 3** etc.
+- `rema` удаляет все видеоалерты с сервера.
+- `pb [x] [y]` устанавливает значения события "СпамПушки" **count\total** в **X\Y**.
+- `serv` включает/отключает команду `!ma` для всех пользователей.
+- `timeout [s]` высталяет таймаут `s` секунд для всех запросов пользователей. Команда `timeout off` убирает этот таймаут. Настройка действует до следующего перезапуска сервера.
 
-`<mode>` required, can be:
-- `fast [text]` message will appear for a while, up to 30 seconds, depending on its length
-- `set [text]` shows/updates the message, it doesn't disappear by itself
-- `hide` hides all types of messages
+### Команда `!msg <режим> [текст]` (только для модераторов)
 
-## TODO
+Показывает сообщения на экране, в углу сверху слева (по умолчанию).
+Это может использоваться модераторами для таких сообщений, как: **Стример ушёл покушать :)**, **Смотрим "Kill la Kill", 3 серия** и т.п.
 
-- Server stability, add more comments in code for devs
-- Write better `README`, detailed, clear, and about everything
-- Add support for `stream.gate-dzgas` platform (as alternative build)
-- Maybe, add support for another streaming platforms
-- Add the ability to change some configurations for moderators (for one server session)
-- Decide what to do with the effects (maybe I'll leave only the modifiers)
+`<режим>` обязательный параметр. Может быть:
+- `fast [текст]` сообщение появится/изменится на некоторое время, до 30 секунд, в зависимости от длины.
+- `set [текст]` показывает/изменяет сообщение, само не пропадёт.
+- `hide` прячет все типы сообщений принудительно.
+
+## Элементы и их настройка
+
+### СпамПушка
+
+СпамПушка - это событие, которое начинается, когда заполняется счётчик видеоалертов, отправленных пользователями. Во время него автоматически отправляется много рандомных видеоалертов из последних 25-ти отправленных ранее пользователями. Событие длится определённое время, после счётчик обнуляется. 
+
+Событие поддаётся настройке в файле конфигурации:
+- `vasgEnabled` включить событие.
+- `vasgLabelText` изменить название события.
+- `vasgTotalCount` сколько нужно отправить видеоалертов, чтобы событие началось.
+- `vasgEnableSaves` включает сохранение прогресса счётчика.
+- `vasgSpammingTime` как долго длится событие, в секундах.
+
+### Рандомные эффекты
+
+Когда сервер бездействует определённое время (никто не отправляет видеоалерты), сервер покажет такое уведомление (пример): **"На следующий Videoalert будет применён эффект Фулскрин на 30 секунд!"**. Ещё есть эффекты **Спам** (отправляет есколко копий) и **Продление** (видеоалерт будет отображаться дольше). Это сделано для того, чтобы напоминать пользователям о возможности отправлять видеоалерты. Тикток-картинки не работают с эффектами. Можно отправлять видеоалерты с модификаторами, они "стакаются" с эффектами.
+
+Событие поддаётся настройке:
+- `allowRandomEffects` включить событие.
+- `randomEffectWait` сколько именно сервер должен бездействовать, в минутах.
+- `efct[имя]` вкл/выкл отдельных эффектов.
+- `efct[имя][настройка]` настройки отдельных эффектов.
+
+### Разметка элементов оверлея
+
+На клиенте сервера помимо видеоалертов также отображается и оверлей. Он содержит такие элементы: Прогрессбар СпамПушки, Окно сообщений модераторов, Уведомления (система, события), Уведомления о событиях неактива. Все эти функции по умолчанию включены, но это можно настроить:
+
+- `vasgEnabled` включает СпамПушку.
+- `messageBoxEnabled` включает окно сообщений модераторов.
+- `disableSystemNotifications` выключает системные уведомления.
+- `disableEventNotifications` выключает уведомления о событиях.
+- `allowRandomEffects` включает случайные эффекты (событие неактива).
+
+Также можно изменить отдельно позиции всех этих элементов. Расположение работает через привязку к одному из 4 углов `Anchor` и указанию отступа от углов `Offset`.
+
+- `markMessageBox**` - окно сообщений модераторов.
+- `markSpamGoal**` - прогрессбар СпамПушки.
+- `markNotifications**` - уведомления системы, событий.
+- `markRandomEffect**` - уведомления о событиях неактива.
+
+### Подключение TTS для модераторов
+
+Вы можете подключить бесплатный TTS API, это позволит модераторам отправлять вам озвученные сообщения. Нужно получить ключ для этого API, для этого нужно сделать следующее:
+
+- Зарегистрироваться на [RapidAPI](https://rapidapi.com/).
+- Перейти сюда [TTS API](https://rapidapi.com/brucewwx/api/streamlined-edge-tts), и подписаться на бесплатный план (для этого НЕ НУЖЕН платёжный аккаунт).
+- Вот здесь [Playground](https://rapidapi.com/brucewwx/api/streamlined-edge-tts/playground/) найдите переменную `x-rapidapi-key`.
+- Скопируйте её значение в конфиг, `apiTTSkey` (это должна быть примерно такая строка: `abcdefg123456789abcdefgh123456abcdfg12345678asdfgh`).
+- Вы также можете выбрать другой голос (`apiTTSvoice` в конфиге), список всех доступных голосов тут [TTS API](https://rapidapi.com/brucewwx/api/streamlined-edge-tts), листайте вниз.
+
+Если всё сделано правильно, то модераторы смогут пользоваться командой `!tts текст...` для озвучивания сообщений на стриме!
+
+### Прочие настройки
+
+- `sourceAllow**` вкл/выкл поддерживаемые источники видео для алертов.
+- `requestVideoTimeout**` настройка таймаутов для запросов пользователей.
+- `tiktokDenyAdVideos` выключает рекламные тиктоки.
+- `randomVideoMax**` рандомизация некоторых переменных в заданном диапазоне
+- `localNetworkAddress` включает распространение сервера по локальной сети. Это позволит подключиться по адресу, который отобразится в консоли, с любого устройства в одной локальной сети с сервером (экспериментально).

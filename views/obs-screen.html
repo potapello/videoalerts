@@ -29,8 +29,6 @@
         }
         
         .video-container video {
-            /* width: 100%;
-            height: 100%; */
             object-fit: cover;
             display: block;
         }
@@ -80,8 +78,6 @@
 
         .pb-progress-container {
             position: fixed;
-            top: 20px;
-            right: 20px;
             width: 20%;
             min-width: 200px;
             background: rgba(0, 0, 0, 0.8);
@@ -184,14 +180,12 @@
         /* Контейнер для уведомлений */
         .notice-container {
             position: fixed;
-            bottom: 20px;
-            right: 20px;
             z-index: 9999;
             pointer-events: none;
         }
         .notice {
             background-color: rgba(0, 0, 0, 0.8);
-            color: white;
+            color: #8aaefd;
             padding: 12px 20px;
             border-radius: 8px;
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -214,8 +208,6 @@
         /* меседж бохс */
         .message-box {
             position: fixed;
-            top: 20px;
-            left: 20px;
             z-index: 9999;
             color: white;
             font-weight: 700;
@@ -248,10 +240,10 @@
     <div class="status-indicator" id="statusIndicator"></div>
 
     <div id="pbProgressBar" class="pb-progress-container hidden">
-        <center><div class="pb-label">МЕМНЫЙ НАСЁР</div></center>
+        <center><div class="pb-label">videocannon</div></center>
         <div class="pb-bar-wrapper">
             <div class="pb-bar-fill" id="pbBarFill"></div>
-            <span class="pb-bar-text" id="pbBarText">0 из 100</span>
+            <span class="pb-bar-text" id="pbBarText">0/100</span>
         </div>
     </div>
 
@@ -259,12 +251,21 @@
     <div class="notice-container">
         <div id="notice" class="notice"></div>
     </div>
+    <!-- Контейнер для рандом эффектов -->
+    <div class="notice-container notice-effect">
+        <div id="random-effect" class="notice"></div>
+    </div>
 
     <!-- меседж бокс -->
      <div id="messageBox" class="message-box"></div>
     
     <script src="/socket.io/socket.io.js"></script>
     <script>
+        // предупреждение о запуске файла напрямую
+        if(window.location.href.indexOf('obs-screen.html') != -1) {
+            alert('Не запускайте эту страницу через файл, так она работать не будет! Чтобы пользоваться страницей, запустите сервер и перейдите по адресу "localhost:3000".')
+        };
+
         // Проверяем режим отладки
         const urlParams = new URLSearchParams(window.location.search);
         const debugMode = urlParams.has('debug');
@@ -291,11 +292,13 @@
         
         // Создание элемента видео
         function createVideoElement(videoData, skipPB=false) {
+            console.info('Creating video element with id:', videoData.id);
             var container = document.createElement('div');
             container.className = 'video-container';
             container.id = videoData.id;
             container.dataset.videoId = videoData.id;
             container.dataset.url = videoData.url;
+            container.style.opacity = `0`;
             
             // Стилизация
             container.style.maxWidth = `${videoData.width}px`;
@@ -307,16 +310,17 @@
             // Создаем видео элемент
             var video = document.createElement('video');
             video.autoplay = true;
-            // video.muted = false; // Включаем звук
 
             // автоподстройка размеров видеоэлемента
             video.oncanplay = () => {
+                container.style.opacity = `1`;
                 if(video.clientHeight > video.clientWidth) {video.style.height = `${videoData.size}px`} else {video.style.width = `${videoData.size}px`};
                 video.style.objectFit = 'contain'
             };
             
             // ютуб хуита
             if(videoData.type == 'yt') {
+                container.style.opacity = `1`;
                 // разлок высоты для шортов
                 if(videoData.url.includes('/shorts/')) {
                     container.style.maxHeight = ``;
@@ -328,6 +332,7 @@
 
             // тикиток картинки
             } else if(videoData.type == 'tti') {
+                container.style.opacity = `1`;
                 const data = JSON.parse(videoData.url);
 
                 var music = document.createElement('audio');
@@ -361,9 +366,7 @@
 
                 if(videoData.type == 'tt') {
                     video.loop = true;
-                    // container.style.maxHeight = ``;
                 } else {
-                    video.loop = videoData.effect == 'longlife';
                     // Обработка конца видео
                     video.onended = function() {
                         removeVideoElement(videoData.id);
@@ -388,11 +391,8 @@
             };
 
             if(!skipPB) {
-                if(!videoData.affected) {
-                    pbAddToCount(1);
-                    histAdd(videoData.url)
-                };
-                if(videoData.modifier) {pbAddToCount(1)}
+                pbAddToCount(1);
+                histAdd(videoData.url)
             };
 
             return container
@@ -464,7 +464,7 @@
         // Обработка WebSocket событий
         socket.on('connect', () => {
             console.log('Connected to server');
-            showNotice('Установлено соединение с сервером Videoalerts!', '#7f7');
+            setTimeout(() => {showNotice('Установлено соединение с сервером Videoalerts!', '#7f7', true)}, 1000);
             connectionActive = true;
             statusIndicator.classList.remove('connection-lost');
             if (debugMode) connectionStatusElement.textContent = 'Connected';
@@ -472,11 +472,14 @@
         
         socket.on('disconnect', () => {
             console.log('Disconnected from server');
-            showNotice('Утеряно соединение с сервером Videoalerts!', '#f77');
+            showNotice('Утеряно соединение с сервером Videoalerts!', '#f77', true);
             connectionActive = false;
             statusIndicator.classList.add('connection-lost');
             if (debugMode) connectionStatusElement.textContent = 'Disconnected';
         });
+
+        var NOTICE_SYSTEM_DISABLE = false;
+        var NOTICE_EVENT_DISABLE = false;
         
         socket.on('init', (data) => {
             console.log('Initial data received:', data.videos.length, 'videos');
@@ -490,42 +493,53 @@
             document.body.style.width = `${data.screen.width}`;
             document.body.style.height = `${data.screen.height}`;
             // setup spam goal
-            pbTotal = data.vasg.total;
+            if(!localStorage.getItem('HIST_PB_TOTAL_KEY')) {pbTotal = data.vasg.total};
             pbEventTime = data.vasg.time + 2; // +2 for video load delay
             document.getElementsByClassName('pb-label')[0].innerHTML = data.vasg.label;
             pbEventEnabled = data.vasg.enabled;
             pbSavesEnabled = data.vasg.saves;
+            // configs
+            NOTICE_SYSTEM_DISABLE = data.NOTICE_SYSTEM_DISABLE;
+            NOTICE_EVENT_DISABLE = data.NOTICE_EVENT_DISABLE;
         });
 
         socket.on('videoAdded', videoAddWorker);
 
         function videoAddWorker(videoData, skipPB=false) {
-            const element = createVideoElement(videoData, skipPB);
+            var element = createVideoElement(videoData, skipPB);
             if(element) {
                 // setup effects
-                if(videoData.affected || videoData.type == 'tti') { // если эффект уже есть - кидаем сразу
-                    if(videoData.modifier) {
-                        console.log('Video modifier:', videoData.modifier);
-                        appendModifierOnElement(element, videoData)
+                if(videoData.type != 'tti') {
+                    if(nextRandomEffect) {
+                        appendElementWithEffect(element, videoData);
+                        nextRandomEffect = false;
+                        hideEffectNotice()
                     } else {
-                        videoContainer.appendChild(element)
+                        videoData.modifier ? element = applyModifierOnElement(element, videoData) : null;
+                        videoContainer.appendChild(element);
                     }
                 } else {
-                    if(videoData.effect != 'none') {
-                        appendEffectOnElement(element, videoData);
-                        console.log("Video effect:", videoData.effect)
-                    } else {
-                        videoContainer.appendChild(element)
-                    }
-
+                    videoContainer.appendChild(element)
                 };
                 updateVideoCount();
             }
         };
         // random effects
-        function appendEffectOnElement(element = new HTMLDivElement(), videoData) {
-            videoData.affected = true;
-            if(videoData.effect == 'fullscreen') {
+        function appendElementWithEffect(element = new HTMLDivElement(), videoData) {
+            console.log('Video effect:', nextRandomEffect.effect);
+            socket.emit('deleteVideo', {id: videoData.id});
+            videoContainer.appendChild(element);
+            removeVideoElement(videoData.id);
+            var videoDataNew = JSON.parse(JSON.stringify(videoData));
+            //
+            if(nextRandomEffect.effect == 'fullscreen') {
+                videoDataNew.id = videoData.id + 'FS';
+                videoDataNew.duration = nextRandomEffect.args * 1000;
+                element = createVideoElement(videoDataNew, true);
+                var video = element.getElementsByTagName('video')[0];
+                if(video) {video.onended = () => {}; video.loop = true};
+                videoData.modifier ? element = applyModifierOnElement(element, videoData) : null;
+                //
                 element.style.transform = ``;
                 element.style.top = `0px`;
                 element.style.left = `0px`;
@@ -547,35 +561,26 @@
                     videoContainer.appendChild(element);
                     setTimeout(() => {removeVideoElement(videoData.id)}, Math.max(10, videoData.duration/2));
                 }
-            } else if(videoData.effect == 'row') {
-                videoContainer.appendChild(element);
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 500+500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1000+500*Math.random());
-                setTimeout(() => {apiRunVideo(videoData, {lifetime: 10000, affected: true})}, 1500+500*Math.random());
-            } else if (videoData.effect == 'longlife') {
-                    try {element.removeChild(element.getElementsByTagName('video')[0])} catch(e) {}; // костыль против какоготохуя играющего саунда вне контейнера
-                    fetch(`/api/stopVideo/${videoData.id}`, {method: 'POST'});
-                    apiRunVideo(videoData, {lifetime: Math.floor(60000 + Math.random() * 60000), affected: true})
-            } else if (videoData.effect == 'slower' || videoData.effect == 'faster') {
-                var media = element.getElementsByTagName('video')[0];
-                if(media) {
-                    media.preservesPitch = false;
-                    media.playbackRate = videoData.effect == 'slower' ? 0.7 : 1.5
-                };
-                videoContainer.appendChild(element)
-            } else if(videoData.effect == 'rotate') {
-                element.classList.add('rotate-animation');
-                videoContainer.appendChild(element)
-            } else if(videoData.effect == 'party' || videoData.effect == 'cursed') {
-                if(videoData.effect == 'party') {element.classList.add('effect_hue_rotate')};
-                if(videoData.effect == 'cursed') {element.style.filter = 'grayscale(0.9) brightness(0.7) contrast(4)'};
-                videoContainer.appendChild(element)
+            //
+            } else if(nextRandomEffect.effect == 'row') {
+                spamVideoalertsCount = nextRandomEffect.args;
+                effectSpamVideoalerts(videoData)
+            //
+            } else if (nextRandomEffect.effect == 'longlife') {
+                    var duration = Math.floor(nextRandomEffect.args[0] + (nextRandomEffect.args[1] - nextRandomEffect.args[0]) * Math.random());
+                    videoDataNew.duration = duration * 1000;
+                    videoDataNew.id = videoData.id + 'LL';
+                    element = createVideoElement(videoDataNew, true);
+                    var video = element.getElementsByTagName('video')[0];
+                    if(video) {video.onended = () => {}; video.loop = true};
+                    videoData.modifier ? element = applyModifierOnElement(element, videoData) : null;
+                    videoContainer.appendChild(element);
             }
         };
         // modifiers by users
-        function appendModifierOnElement(element = new HTMLDivElement(), videoData) {
+        function applyModifierOnElement(element = new HTMLDivElement(), videoData) {
             var modifier = videoData.modifier.split(' ');
+            console.log('Video modifier:', videoData.modifier);
             // position
             if(modifier[0] == 'pos') {
                 element.style.transform = ``;
@@ -609,11 +614,31 @@
                         media.width = Math.floor(videoData.size*0.4);
                         media.height = videoData.size;
                     }
-                } // invert(1) saturate(2)
+                }
             };
-            videoContainer.appendChild(element)
+            return element
         };
-        
+        //
+        let spamVideoalertsCount = 0;
+        function effectSpamVideoalerts(videoData) {
+            var videoDataNew = JSON.parse(JSON.stringify(videoData));
+            videoDataNew.id = videoData.id + 'SPAM' + spamVideoalertsCount; // for different id's
+            //
+            videoDataNew.top = Math.floor(videoData.screenY * 0.02 + Math.random() * ((videoData.screenY - videoData.size) * 0.96));
+            videoDataNew.left = Math.floor(videoData.screenX * 0.02 + Math.random() * ((videoData.screenX - videoData.size) * 0.96));
+            //
+            var element = createVideoElement(videoDataNew, true);
+            (videoData.modifier && !videoData.modifier.includes('pos ')) ? element = applyModifierOnElement(element, videoData) : null;
+            videoContainer.appendChild(element);
+            //
+            spamVideoalertsCount -= 1;
+            if(spamVideoalertsCount > 0) {
+                setTimeout(() => {effectSpamVideoalerts(videoData)}, 500 + Math.floor(500 * Math.random()));
+            }
+        };
+        //
+        //  SERVER
+        //
         socket.on('videoRemoved', (videoId) => {
             // console.log('Video removed:', videoId);
             removeVideoElement(videoId);
@@ -711,10 +736,9 @@
             pbEventProgress -= 1;
             if(pbEventProgress > 1) {
                 var eff = _randomalertsgeteff();
-                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, affected: true, type: undefined})};
+                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined})};
                 eff = _randomalertsgeteff();
-                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, affected: true, type: undefined})};
-                // if(Math.random() < 0.4) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, affected: true, effect: 'none', type: undefined})};
+                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined})};
                 setTimeout(() => {pbDeployRandomAlerts()}, 1000)
             } else {
                 setTimeout(() => {pbEventProgress = 0; pbSetProgress(0, pbTotal)}, 5*1000);
@@ -834,26 +858,49 @@
             showNotice('История алертов для ВидеоПушки удалена!', '#ff5555')
         });
 
-        // системные уведомления
+        // системные уведомления и уведомление рандом эффектов
         let noticeTimeout;
+        let effectNoticeTimeout;
+        let nextRandomEffect = false;
 
-        function showNotice(text, color) {
+        function showNotice(text, color, sys=false) {
+            if(sys) {if(NOTICE_SYSTEM_DISABLE) {return}} else {if(NOTICE_EVENT_DISABLE) {return}};
+            //
             const noticeElement = document.getElementById('notice');
             noticeElement.textContent = text;
             noticeElement.style.color = color;
             noticeElement.classList.add('visible');
 
-            if (noticeTimeout) {
-                clearTimeout(noticeTimeout);
-            };
+            if (noticeTimeout) clearTimeout(noticeTimeout);
             noticeTimeout = setTimeout(() => {
                 noticeElement.classList.remove('visible');
                 noticeTimeout = null;
             }, 5000)
         };
 
+        function showEffectNotice(text) {
+            const noticeElement = document.getElementById('random-effect');
+            noticeElement.textContent = text;
+            noticeElement.classList.add('visible');
+
+            if(effectNoticeTimeout) clearInterval(effectNoticeTimeout);
+            effectNoticeTimeout = setTimeout(() => {
+                noticeElement.classList.remove('visible');
+                effectNoticeTimeout = null;
+            }, 60000);
+        };
+        function hideEffectNotice() {
+            document.getElementById('random-effect').classList.remove('visible');
+            if(effectNoticeTimeout) clearInterval(effectNoticeTimeout);
+            effectNoticeTimeout = null;
+        };
+
         socket.on('showNotice', (values) => {
             showNotice(values.text, values.color)
+        });
+        socket.on('setRandomEffect', (data) => {
+            showEffectNotice(data.desc);
+            nextRandomEffect = {effect: data.effect, args: data.args}
         });
 
         // MESSAGE BOX CONTROLS
@@ -904,7 +951,23 @@
             if(values.type == 'set') {messageBoxSet(values.message); return};
             if(values.type == 'hide') {messageBoxHide()}
         });
+        //
+        // MARKUP OVERLAY ELEMENTS
+        //
+        function markupOverlay(elem, corner, offset=[0,0]) {
+            var element = document.getElementsByClassName(elem)[0];
+            element.style.top = ``; element.style.bottom = ``; element.style.left = ``; element.style.right = ``;
+            if(corner == 'TL') {element.style.left = `${offset[0]}px`; element.style.top = `${offset[1]}px`; return};
+            if(corner == 'TR') {element.style.right = `${offset[0]}px`; element.style.top = `${offset[1]}px`; return};
+            if(corner == 'BL') {element.style.left = `${offset[0]}px`; element.style.bottom = `${offset[1]}px`; return};
+            if(corner == 'BR') {element.style.right = `${offset[0]}px`; element.style.bottom = `${offset[1]}px`; return};
+            throw new Error('Unknown markup corner: ' + corner);
+        };
 
+        socket.on("markup", (data) => {
+            // elems: message-box, notice-container, pb-progress-container, notice-effect
+            markupOverlay(data.element, data.corner, data.offset)
+        });
         //
         // TTS Audio Player
         //
@@ -939,18 +1002,12 @@
         };
         // функция для запуска разных видео
         function apiRunVideo(vd, changes = {}) {
-            fetch('/api/runVideo', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({
-                    videoUrl: changes.url !== undefined ? changes.url : vd.url,
-                    type: changes.type !== undefined ? changes.type : vd.type,
-                    lifetime: changes.lifetime !== undefined ? changes.lifetime : vd.lifetime,
-                    affected: changes.affected !== undefined ? changes.affected : vd.affected,
-                    effect: changes.effect !== undefined ? changes.effect : vd.effect,
-                    modifier: changes.modifier !== undefined ? changes.modifier : vd.modifier,
-                })
-            })
+            socket.emit("runVideo", {
+                videoUrl: changes.url !== undefined ? changes.url : vd.url,
+                type: changes.type !== undefined ? changes.type : vd.type,
+                lifetime: changes.lifetime !== undefined ? changes.lifetime : vd.lifetime,
+                modifier: changes.modifier !== undefined ? changes.modifier : vd.modifier,
+            });
         };
     </script>
 </body>

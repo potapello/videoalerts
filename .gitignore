@@ -1,4 +1,5 @@
 node_modules
 logs
 temp
-tts
+README-EN.md
+build.bat
