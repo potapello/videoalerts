@@ -1,0 +1,1 @@
+bun build --compile --target=bun-windows-x64 ./main.js --outfile videoalerts.exe
