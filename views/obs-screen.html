@@ -38,7 +38,7 @@
             bottom: 0;
             left: 0;
             right: 0;
-            background: linear-gradient(transparent, rgba(0,0,0,0.7));
+            background: rgba(0,0,0,0.7);
             color: white;
             padding: 5px 10px;
             font-size: 12px;
@@ -385,7 +385,7 @@
             if (debugMode) {
                 var overlay = document.createElement('div');
                 overlay.className = 'video-overlay';
-                overlay.textContent = `ID: ${videoData.id.substring(0, 8)}`;
+                overlay.textContent = `ID: ${videoData.id}`;
                 overlay.style.display = 'block';
                 container.appendChild(overlay);
             };
@@ -498,6 +498,7 @@
             document.getElementsByClassName('pb-label')[0].innerHTML = data.vasg.label;
             pbEventEnabled = data.vasg.enabled;
             pbSavesEnabled = data.vasg.saves;
+            pbSpamIntensivity = Math.max(0, Math.min(3, data.vasg.intens));
             // configs
             NOTICE_SYSTEM_DISABLE = data.NOTICE_SYSTEM_DISABLE;
             NOTICE_EVENT_DISABLE = data.NOTICE_EVENT_DISABLE;
@@ -672,6 +673,7 @@
         let pbTimeout = null;
         let pbEventEnabled = true;
         let pbSavesEnabled = true;
+        let pbSpamIntensivity = 1; // [0;2]
         const pbElement = document.getElementById('pbProgressBar');
         const pbFillElement = document.getElementById('pbBarFill');
         const pbTextElement = document.getElementById('pbBarText');
@@ -729,16 +731,29 @@
         function pbRandomAlert() {
             return pbLastAlerts[Math.floor(Math.random() * (pbLastAlerts.length - 0.001))]
         };
-        var _randomalertseffects = ['rotate', undefined, 'slower', undefined, 'faster', undefined, 'party', undefined, 'cursed', undefined, 'wide', undefined, 'tall', undefined, 'invert'];
+        var _randomalertseffects = ['rotate', 'slower', undefined, 'faster', undefined, 'party', 'cursed', undefined, 'wide', undefined, 'tall', 'invert'];
         var _randomalertsgeteff = () => _randomalertseffects[Math.floor(Math.random() * (_randomalertseffects - 0.001))];
 
         function pbDeployRandomAlerts() {
             pbEventProgress -= 1;
+            var eff;
             if(pbEventProgress > 1) {
-                var eff = _randomalertsgeteff();
-                if(Math.random() < 0.9) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined})};
-                eff = _randomalertsgeteff();
-                if(Math.random() < 0.5) {apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined})};
+                if(pbSpamIntensivity == 0) {
+                    if(Math.random() < 0.8) {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 12000, modifier: eff, type: undefined})};
+                } else if(pbSpamIntensivity == 1) {
+                    eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined});
+                    if(Math.random() < 0.5) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined})}, 500)};
+                } else if(pbSpamIntensivity == 2) {
+                    eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 10000, modifier: eff, type: undefined});
+                    if(Math.random() < 0.8) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 8500, modifier: eff, type: undefined})}, 333)};
+                    if(Math.random() < 0.4) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 8500, modifier: eff, type: undefined})}, 666)};
+                } else {
+                    eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 7500, modifier: eff, type: undefined});
+                    setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 7500, modifier: eff, type: undefined})}, 200);
+                    if(Math.random() < 0.8) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 7500, modifier: eff, type: undefined})}, 400)};
+                    if(Math.random() < 0.5) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 7500, modifier: eff, type: undefined})}, 600)};
+                    if(Math.random() < 0.3) {setTimeout(() => {eff = _randomalertsgeteff(); apiRunVideo({}, {url: pbRandomAlert(), lifetime: 7500, modifier: eff, type: undefined})}, 800)};
+                };
                 setTimeout(() => {pbDeployRandomAlerts()}, 1000)
             } else {
                 setTimeout(() => {pbEventProgress = 0; pbSetProgress(0, pbTotal)}, 5*1000);

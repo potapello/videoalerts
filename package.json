@@ -1,6 +1,6 @@
 {
   "name": "stream-videoalerts",
-  "version": "0.7.0",
+  "version": "0.7.1",
   "description": "Videoalerts for Twitch streams",
   "main": "main.js",
   "scripts": {

@@ -4,7 +4,6 @@ const socketIo = require('socket.io');
 const path = require('path');
 const fs = require('fs');
 const cfg = require('cfg-lib');
-// const { spawn } = require('child_process');
 
 const app = express();
 const server = http.createServer(app);
@@ -617,7 +616,7 @@ function apiRunVideo(body = {}) {
     if (!videoUrl) {
         throw new Error('apiRunVideo(): videoUrl is required!');
     };
-    const id = `video_${Date.now()}`;
+    const id = `video_${Date.now()}_${Math.floor(Math.random()*999999)}`;
     logInFileOnly("Received /api/runVideo: " + String(videoUrl).slice(0, 200));
         
     const size = RANDOMIZE_VIDEO_SIZE ? Math.floor(VIDEO_MAX_SIZE * 0.8 + Math.random() * (VIDEO_MAX_SIZE * 0.2)) : VIDEO_MAX_SIZE;
@@ -775,7 +774,7 @@ function removeVideo(videoId) {
         return true;
     }
     return false;
-}
+};
 
 // Socket.io для реального времени
 io.on('connection', (socket) => {
@@ -795,6 +794,7 @@ io.on('connection', (socket) => {
             time: _options.get('vasgSpammingTime'),
             label: _options.get('vasgLabelText'),
             saves: _options.get('vasgEnableSaves'),
+            intens: _options.get('vasgSpammingIntensivity'),
         },
         // configs
         NOTICE_SYSTEM_DISABLE,
@@ -897,7 +897,7 @@ function overlayMarkup() {
 //
 // Запуск сервера
 const LOCAL_NETWORK_ADDRESS = _options.get('localNetworkAddress');
-const APP_CONSOLE_DESC = `Videoalerts 0.7.0 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
+const APP_CONSOLE_DESC = `Videoalerts 0.7.1 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
 //
 if(LOCAL_NETWORK_ADDRESS) {
     server.listen(PORT, '0.0.0.0', () => {
