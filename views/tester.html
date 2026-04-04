@@ -258,10 +258,47 @@
             color: #f00;
         }
 
-        .detail-tag.affected {
-            background: #bb86fc33;
-            color: #bb86fc;
-            border: 1px solid #bb86fc;
+        .detail-tag.memory {
+            font-size: 16px;
+            font-weight: 600;
+            background: #000b31;
+            color: #a7dfff;
+            border: 0;
+        }
+        .detail-tag.connected {
+            font-size: 16px;
+            font-weight: 600;
+            background: #003107;
+            color: #89fd85;
+            border: 0;
+        }
+        .detail-tag.disconnected {
+            font-size: 16px;
+            font-weight: 600;
+            background: #310000;
+            color: #fd8585;
+            border: 0;
+        }
+        .detail-tag.device {
+            font-size: 16px;
+            font-weight: 600;
+            background: #312800;
+            color: #f1fd85;
+            border: 0;
+        }
+        .detail-tag.screen {
+            font-size: 16px;
+            font-weight: 600;
+            background: #190031;
+            color: #d6a4ff;
+            border: 0;
+        }
+        .detail-tag.agent {
+            font-size: 12px;
+            font-weight: 500;
+            background: #31280000;
+            color: #f1fd85;
+            border: 0;
         }
 
         .timer {
@@ -351,22 +388,11 @@
         <!-- Status messages -->
         <div id="messageContainer"></div>
 
-        <!-- Запуск видео -->
-        <div class="card">
-            <h2>🚀 Запуск видео</h2>
-            <div class="form-group">
-                <label for="videoUrl">Ссылка на видео</label>
-                <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4 или /local/video.mp4" value="">
-            </div>
-            
-            <div class="form-group">
-                <label for="lifetime">Время жизни (сек): <span id="lifetimeValue" class="range-value">30</span></label>
-                <input type="range" id="lifetime" min="5" max="60" value="30" step="1">
-            </div>
-
-            <button id="runVideoBtn">Запустить видео</button>
-            <div style="margin-top: 15px; color: #888; font-size: 12px;">
-                <span class="detail-tag">POST /api/runVideo</span> required: videoUrl; optional: lifetime, type, modifier 
+        <!-- Profiler -->
+        <div class="card profiler">
+            <h2>⏱️ Состояние клиента</h2>
+            <div style="margin-top: 15px;">
+                <span class="detail-tag device">Проверка...</span>
             </div>
         </div>
 
@@ -457,7 +483,39 @@
         </div>
     </div>
 
+    <script src="/socket.io/socket.io.js"></script>
     <script>
+        // socket
+        const socket = io();
+        var connectionActive = false;
+
+        var CLIENT_PROFILER = {};
+        var CLIENT_CONNECTED = false;
+        //
+        socket.on('connect', () => {
+            console.info('Connected to server');
+            connectionActive = true
+        });
+        
+        socket.on('disconnect', () => {
+            console.info('Disconnected from server');
+            connectionActive = false
+        });
+        
+        socket.on('init', (data) => {
+            console.info('Initial data received.');
+        });
+
+        // profiler
+        setInterval(() => {
+            socket.emit('getprofiler')
+        }, 1000);
+        socket.on('profiler', (data) => {
+            CLIENT_CONNECTED = data.connected;
+            CLIENT_PROFILER = data.profile;
+            //
+            profilerUpdate(data.connected, data.profile)
+        });
         // предупреждение о запуске файла напрямую
         if(window.location.href.indexOf('tester.html') != -1) {
             alert('Не запускайте эту страницу через файл, так она работать не будет! Чтобы пользоваться страницей, запустите сервер и перейдите по адресу "localhost:3000/tester".')
@@ -468,12 +526,6 @@
 
         // DOM элементы
         const messageContainer = document.getElementById('messageContainer');
-        const videoUrl = document.getElementById('videoUrl');
-        const lifetime = document.getElementById('lifetime');
-        const lifetimeValue = document.getElementById('lifetimeValue');
-        const affected = document.getElementById('affected');
-        // affected.checked = true;
-        const runVideoBtn = document.getElementById('runVideoBtn');
         const stopAllBtn = document.getElementById('stopAllBtn');
         const stopHint = document.getElementById('stopHint');
         const refreshVideosBtn = document.getElementById('refreshVideosBtn');
@@ -487,56 +539,39 @@
         let pressTimer = null;
         let isPressing = false;
 
-        // Обновление значения ползунка
-        lifetime.addEventListener('input', () => {
-            lifetimeValue.textContent = lifetime.value;
-        });
+        // update profiler data
+        function profilerUpdate(connect, profile) {
+            if(connect) {
+                var mem_use = Math.round(profile.mem_use/1024/102.4)/10;
+                var mem_heap = Math.round(profile.mem_heap/1024/102.4)/10;
+                document.getElementsByClassName('profiler')[0].innerHTML = 
+                `<h2>⏱️ Состояние клиента</h2>
+                <div style="margin-top: 15px;">
+                    <span class="detail-tag connected">Подключен</span>
+                    <span class="detail-tag device">Platform: ${profile.platform}</span>
+                    <span class="detail-tag screen">Size: ${profile.screen}</span>
+                    <span class="detail-tag screen">Now: ${Math.floor(profile.now/1000)} s.</span>
+                </div><p>
+                <div style="margin-top: 15px;">
+                    <span class="detail-tag memory">Heap Memory (Used/Total): ${mem_use}MB / ${mem_heap}MB</span>
+                </div><p>
+                <div style="margin-top: 8px;">
+                    <span class="detail-tag agent">User Agent: ${profile.agent}</span>
+                </div>`
+            } else {
+                document.getElementsByClassName('profiler')[0].innerHTML = 
+                `<h2>⏱️ Состояние клиента</h2>
+                <div style="margin-top: 15px;">
+                <span class="detail-tag disconnected">Не подключен</span>
+                </div>`
+            }
+        };
 
         // Функции для отображения сообщений
         function showMessage(text, type = 'error') {
             messageContainer.innerHTML = `
                 <div class="${type}-message">${(new Date()).toLocaleTimeString('ru-RU', {timeZone: 'Europe/Moscow', hour12: false})} | ${text}</div>
             `}
-
-        // Запуск видео
-        async function runVideo() {
-            var url = String(videoUrl.value.trim());
-            if (!url) {
-                showMessage('Введите ссылку на видео', 'error');
-                return;
-            }
-
-            var data = {
-                videoUrl: url,
-                type: 'ma',
-                lifetime: parseInt(lifetime.value * 1000),
-            };
-
-            if(url.includes('youtu')) {data.type = 'yt'};
-            if(url.includes('tiktok')) {showMessage(`Нельзя отправить тиктоки через "Запуск видео", используйте псевдосообщения!`, `error`); return};
-
-            try {
-                const response = await fetch(`/api/runVideo`, {
-                    method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    },
-                    body: JSON.stringify(data)
-                });
-
-                if (!response.ok) {
-                    throw new Error(`HTTP error! status: ${response.status}`);
-                }
-
-                const result = await response.json();
-                showMessage(`Видео запущено! ID: ${result.videoId}`, 'success');
-                fetchActiveVideos();
-
-            } catch (error) {
-                showMessage(`Ошибка запуска видео: ${error.message}`, 'error');
-                console.error('Error:', error);
-            }
-        }
 
         async function pseudoMessage() {
             const msg = String(messageText.value);
@@ -800,16 +835,8 @@
         };
 
         // Обработчики для других кнопок
-        runVideoBtn.addEventListener('click', runVideo);
         refreshVideosBtn.addEventListener('click', fetchActiveVideos);
         pseudoMessageBtn.addEventListener('click', pseudoMessage);
-
-        // Обработка клавиши Enter в поле ввода
-        videoUrl.addEventListener('keypress', (e) => {
-            if (e.key === 'Enter') {
-                runVideo();
-            }
-        });
 
         // события контроля прогрессбаром
         document.getElementById('pbShowBtn').addEventListener('click', showProgressBar);
