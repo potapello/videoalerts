@@ -469,7 +469,7 @@ function twitchMessage(username, message) {
                 } else if(msgsplit[1] == 'set') {
                     if(msgsplit[2]) {io.emit('msgBox', {type: 'set', message: message.substring(9)}); _messageBoxLastSet = message.substring(9)}
                 } else if(msgsplit[1] == 'hide') {
-                    io.emit('msgBox', {type: 'hide', message: null}); _messageBox.action = 'hide';
+                    io.emit('msgBox', {type: 'hide', message: null})
                 }
             }
         }
@@ -775,48 +775,81 @@ function removeVideo(videoId) {
     }
     return false;
 };
-
-// Socket.io для реального времени
+//
+// @vd SOCKET
+//
+var MAIN_CLIENT_CONNECTED = false;
+var MAIN_CLIENT_PROFILER = {};
 io.on('connection', (socket) => {
-    console.log(`New client connected: ${socket.id}`);
-    
-    // Отправляем текущие активные видео новому клиенту
-    socket.emit('init', { 
-        videos: activeVideos.filter(v => {
-            return Date.now() - v.startTime < v.duration;
-        }),
-        // screen sizes
-        screen: {width: SCREEN_WIDTH, height: SCREEN_HEIGHT},
-        // videoalert spam goal config
-        vasg: {
-            enabled: _options.get('vasgEnabled'),
-            total: _options.get('vasgTotalCount'),
-            time: _options.get('vasgSpammingTime'),
-            label: _options.get('vasgLabelText'),
-            saves: _options.get('vasgEnableSaves'),
-            intens: _options.get('vasgSpammingIntensivity'),
-        },
-        // configs
-        NOTICE_SYSTEM_DISABLE,
-        NOTICE_EVENT_DISABLE,
-    });
-    
-    overlayMarkup();
+    const referer = socket.handshake.headers.referer;
+  
+    if (referer && referer.includes('/tester')) {
+        console.log('Tester client connected:', socket.id);
+        // send info to tester
+        socket.emit('init', {
+            role: 'tester',
+        });
+        socket.on('getprofiler', () => {
+            socket.emit('profiler', {
+                connected: MAIN_CLIENT_CONNECTED,
+                profile: MAIN_CLIENT_PROFILER
+            })
+        })
+        // events
+        socket.on('disconnect', () => {
+            console.log('Tester client disconnected:', socket.id);
+        });
+    } else {
+        // limit by one client
+        if (MAIN_CLIENT_CONNECTED) {
+            socket.emit('error', {limit: true});
+            return;
+        };
+        MAIN_CLIENT_CONNECTED = true;
+        console.log('Client connected:', socket.id);
+        // Отправляем текущие активные видео новому клиенту
+        socket.emit('init', { 
+            role: 'user',
+            videos: activeVideos.filter(v => {
+                return Date.now() - v.startTime < v.duration;
+            }),
+            // screen sizes
+            screen: {width: SCREEN_WIDTH, height: SCREEN_HEIGHT},
+            // videoalert spam goal config
+            vasg: {
+                enabled: _options.get('vasgEnabled'),
+                total: _options.get('vasgTotalCount'),
+                time: _options.get('vasgSpammingTime'),
+                label: _options.get('vasgLabelText'),
+                saves: _options.get('vasgEnableSaves'),
+                intens: _options.get('vasgSpammingIntensivity'),
+            },
+            // configs
+            NOTICE_SYSTEM_DISABLE,
+            NOTICE_EVENT_DISABLE,
+        });
+        
+        overlayMarkup();
 
-    if(_messageBoxLastSet && ENABLE_MSG_BOX) {
-        socket.emit('msgBox', {type: 'set', message: _messageBoxLastSet})
-    };
+        if(_messageBoxLastSet && ENABLE_MSG_BOX) {
+            socket.emit('msgBox', {type: 'set', message: _messageBoxLastSet})
+        };
     
-    socket.on('disconnect', () => {
-        console.log(`Client disconnected:' ${socket.id}`);
-    });
-    // RECEIVE REQUESTS FROM CLIENTS
-    socket.on('runVideo', data => {
-        apiRunVideo(data)
-    });
-    socket.on('deleteVideo', data => {
-        removeVideo(data.id)
-    });
+        socket.on('disconnect', () => {
+            MAIN_CLIENT_CONNECTED = false;
+            console.log('Client disconnected:', socket.id);
+        });
+        // RECEIVE REQUESTS FROM CLIENTS
+        socket.on('runVideo', data => {
+            apiRunVideo(data)
+        });
+        socket.on('deleteVideo', data => {
+            removeVideo(data.id)
+        });
+        socket.on('profiler', data => {
+            MAIN_CLIENT_PROFILER = data
+        });
+    }
 });
 
 // API для управления мем пушками на всех подключенных клиентах
@@ -897,7 +930,7 @@ function overlayMarkup() {
 //
 // Запуск сервера
 const LOCAL_NETWORK_ADDRESS = _options.get('localNetworkAddress');
-const APP_CONSOLE_DESC = `Videoalerts 0.7.1 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
+const APP_CONSOLE_DESC = `Videoalerts 0.7.2 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
 //
 if(LOCAL_NETWORK_ADDRESS) {
     server.listen(PORT, '0.0.0.0', () => {

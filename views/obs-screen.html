@@ -478,13 +478,27 @@
             if (debugMode) connectionStatusElement.textContent = 'Disconnected';
         });
 
+        var SOCKET_DISCONNECTED = false;
+        socket.on('error', (data) => {
+            // check for client limit
+            if(data.limit) {
+                alert('Один клиент уже запущен и подключен к серверу! Максимальное число клиентов: 1.');
+                // disconnect socket
+                SOCKET_DISCONNECTED = true;
+                socket.disconnect();
+                // clear page
+                document.head.innerHTML = '';
+                document.body.innerHTML = ''
+            };
+        });
+
         var NOTICE_SYSTEM_DISABLE = false;
         var NOTICE_EVENT_DISABLE = false;
         
         socket.on('init', (data) => {
             console.log('Initial data received:', data.videos.length, 'videos');
             clearAllVideos();
-            
+
             // Добавляем активные видео
             data.videos.forEach(videoData => {
                 videoAddWorker(videoData, true)
@@ -650,13 +664,24 @@
             clearAllVideos();
         });
         
-        // Автоматическое переподключение
+        // auto-reconnect + profiler
         setInterval(() => {
-            if (!connectionActive && socket.disconnected) {
+            if (!connectionActive && socket.disconnected && !SOCKET_DISCONNECTED) {
                 console.log('Attempting to reconnect...');
                 socket.connect();
             }
         }, 5000);
+        setInterval(() => {
+            // profile
+            socket.emit('profiler', {
+                mem_use: performance.memory.usedJSHeapSize,
+                mem_heap: performance.memory.totalJSHeapSize,
+                screen: `${screen.width}x${screen.height}`,
+                agent: navigator.userAgent,
+                platform: navigator.platform,
+                now: performance.now()
+            });
+        }, 1000);
         
         // Обновление счетчика каждую секунду в режиме отладки
         if (debugMode) {
