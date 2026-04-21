@@ -27,6 +27,9 @@
             box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
             transition: transform 0.3s ease, opacity 0.3s ease;
         }
+        .video-container.noshadow {
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0);
+        }
         
         .video-container video {
             object-fit: cover;
@@ -289,12 +292,17 @@
                 videoCountElement.textContent = document.querySelectorAll('.video-container').length;
             }
         };
+
+        function logClientError(msg='') {
+            socket.emit('clientError', {message: msg});
+        };
         
+        var VIDEO_SHADOW_DISABLED = false;
         // Создание элемента видео
         function createVideoElement(videoData, skipPB=false) {
             console.info('Creating video element with id:', videoData.id);
             var container = document.createElement('div');
-            container.className = 'video-container';
+            VIDEO_SHADOW_DISABLED ? container.className = 'video-container noshadow' : container.className = 'video-container';
             container.id = videoData.id;
             container.dataset.videoId = videoData.id;
             container.dataset.url = videoData.url;
@@ -316,6 +324,13 @@
                 container.style.opacity = `1`;
                 if(video.clientHeight > video.clientWidth) {video.style.height = `${videoData.size}px`} else {video.style.width = `${videoData.size}px`};
                 video.style.objectFit = 'contain'
+            };
+            setTimeout(() => {container.style.opacity = `1`}, 4000); // for prevent vanished video
+
+            // отслеживание ощибок
+            video.onerror = (e) => {
+                logClientError(`Video "${videoData.id}" canceled with unknown error.`);
+                removeVideoElement(videoData.id)
             };
             
             // ютуб хуита
@@ -516,6 +531,7 @@
             // configs
             NOTICE_SYSTEM_DISABLE = data.NOTICE_SYSTEM_DISABLE;
             NOTICE_EVENT_DISABLE = data.NOTICE_EVENT_DISABLE;
+            VIDEO_SHADOW_DISABLED = data.VIDEO_SHADOW_DISABLED;
         });
 
         socket.on('videoAdded', videoAddWorker);

@@ -780,6 +780,8 @@ function removeVideo(videoId) {
 //
 var MAIN_CLIENT_CONNECTED = false;
 var MAIN_CLIENT_PROFILER = {};
+var VIDEO_SHADOW_DISABLED = _options.get('videoDisableShadows');
+
 io.on('connection', (socket) => {
     const referer = socket.handshake.headers.referer;
   
@@ -827,6 +829,8 @@ io.on('connection', (socket) => {
             // configs
             NOTICE_SYSTEM_DISABLE,
             NOTICE_EVENT_DISABLE,
+            VIDEO_SHADOW_DISABLED,
+
         });
         
         overlayMarkup();
@@ -848,6 +852,9 @@ io.on('connection', (socket) => {
         });
         socket.on('profiler', data => {
             MAIN_CLIENT_PROFILER = data
+        });
+        socket.on('clientError', data => {
+            console.error('[CLIENT]', data.message)
         });
     }
 });
@@ -930,7 +937,7 @@ function overlayMarkup() {
 //
 // Запуск сервера
 const LOCAL_NETWORK_ADDRESS = _options.get('localNetworkAddress');
-const APP_CONSOLE_DESC = `Videoalerts 0.7.2 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
+const APP_CONSOLE_DESC = `Videoalerts 0.7.3 beta\nNode.js server (express, socket.io) | Build using Bun | by potapello`; // @rel
 //
 if(LOCAL_NETWORK_ADDRESS) {
     server.listen(PORT, '0.0.0.0', () => {
@@ -938,14 +945,18 @@ if(LOCAL_NETWORK_ADDRESS) {
         console.log(`Server running on: http://localhost:${PORT}`);
 
         // Получаем IP в локальной сети
+        var _locals = null;
         const networkInterfaces = require('os').networkInterfaces();
         Object.values(networkInterfaces).forEach(interfaces => {
             interfaces.forEach(iface => {
                 if (iface.family === 'IPv4' && !iface.internal && iface.address.indexOf('192.168.') != -1) {
-                    console.log(`Local network address: http://${iface.address}:${PORT}\n`);
+                    _locals = iface.address;
                 }
             })
-        })
+        });
+        if(_locals == null) {console.warn('Error with getting local network adress!')} else {
+            console.log(`Local network address: http://${_locals}:${PORT}\n`);
+        }
     })
 } else {
     server.listen(PORT, () => {
